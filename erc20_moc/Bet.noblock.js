@@ -128,7 +128,7 @@ class Bet {
 
     isResolved = async () => {
         const result = await getReport(this.betId);
-        return result.length === 0;
+        return result.length !== 0;
     }
 
     /**
