@@ -140,6 +140,9 @@ class Bet {
         if (await this.isResolved()) {
             throw new NoWeb3Exception("The Bet is already resolved!");
         }
+        if (["yes", "no"].includes(outcome)) {
+            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\"");
+        }
         await insertReport(this.betId, reporter, outcome, new Date());
     }
 }
