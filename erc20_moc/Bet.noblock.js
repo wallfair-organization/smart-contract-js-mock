@@ -6,7 +6,6 @@ const COLLATERAL_TOKEN = "EVNT";
 
 const YES_TOKEN_PREFIX = "YES_";
 const NO_TOKEN_PREFIX = "NO_";
-const LP_TOKEN_PREFIX = "LP_";
 const WALLET_PREFIX = "BET_";
 const FEE_WALLET_PREFIX = "FEE_";
 
@@ -23,8 +22,9 @@ class Bet {
     }
 
     addLiquidity = async (provider, amount) => {
-        await this.yesToken.mint(this.walletId, 1000);
-        await this.noToken.mint(this.walletId, 10000);
+        await this.collateralToken.transfer(provider, this.walletId, amount);
+        await this.yesToken.mint(this.walletId, amount);
+        await this.noToken.mint(this.walletId, amount);
     }
 
     /**
@@ -41,7 +41,7 @@ class Bet {
         };
 
         if (!Object.keys(poolBalances).includes(outcome)) {
-            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\"")
+            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\", but is \"" + outcome + "\"");
         }
 
         const investmentAmountMinusFees = investmentAmount - (investmentAmount * this.fee);
@@ -73,7 +73,7 @@ class Bet {
         };
 
         if (!Object.keys(poolBalances).includes(outcome)) {
-            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\"");
+            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\", but is \"" + outcome + "\"");
         }
 
         const returnAmountPlusFees = returnAmount + (returnAmount * this.fee);
@@ -140,10 +140,24 @@ class Bet {
         if (await this.isResolved()) {
             throw new NoWeb3Exception("The Bet is already resolved!");
         }
-        if (["yes", "no"].includes(outcome)) {
-            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\"");
+        if (!["yes", "no"].includes(outcome)) {
+            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\", but is \"" + outcome + "\"");
         }
         await insertReport(this.betId, reporter, outcome, new Date());
+    }
+
+    getPayout = async (beneficiary) => {
+        if (!(await this.isResolved())) {
+            throw new NoWeb3Exception("The Bet is not resolved yet!");
+        }
+        const outcome = (await this.getResult())['outcome'];
+        const outcomeToken = { "yes": this.yesToken, "no": this.noToken }[outcome];
+
+        const outcomeBalance = await outcomeToken.balanceOf(beneficiary);
+
+        await outcomeToken.burn(beneficiary, outcomeBalance);
+        await this.collateralToken.transfer(this.walletId, beneficiary, outcomeBalance);
+
     }
 }
 

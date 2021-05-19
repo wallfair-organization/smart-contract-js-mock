@@ -1,4 +1,11 @@
-const {insertTransaction, getTransactionOfUser} = require('../utils/db_helper.js');
+const {
+    createDBTransaction,
+    commitDBTransaction,
+    rollbackDBTransaction,
+    insertTransaction,
+    getBalanceOfUser,
+    updateBalanceOfUser
+} = require('../utils/db_helper');
 const NoWeb3Exception = require('./Exception.noblock');
 
 class ERC20 {
@@ -18,15 +25,10 @@ class ERC20 {
      * @returns {Promise<number>}
      */
     balanceOf = async (user) => {
-        const results = await getTransactionOfUser(user, this.symbol);
+        const results = await getBalanceOfUser(user, this.symbol);
         let balance = 0;
-        for (const result_index in results) {
-            const result = results[result_index];
-            if (result.sender === user) {
-                balance -= result.amount;
-            } else if(result.receiver === user) {
-                balance += result.amount;
-            }
+        if (results.length > 0) {
+            balance = results[0].balance;
         }
         return balance;
     }
@@ -41,10 +43,22 @@ class ERC20 {
      */
     transfer = async (sender, receiver, amount) => {
         if (amount > 0) {
+            await createDBTransaction();
+
             const senderBalance = await this.balanceOf(sender);
             if (senderBalance >= amount) {
-                await insertTransaction(sender, receiver, amount, this.symbol, new Date());
+                const receiverBalance = await this.balanceOf(receiver);
+
+                const trx_time = new Date();
+
+                await updateBalanceOfUser(sender, this.symbol, trx_time, senderBalance - amount);
+                await updateBalanceOfUser(receiver, this.symbol, trx_time, receiverBalance + amount);
+                await insertTransaction(sender, receiver, amount, this.symbol, trx_time);
+
+                await commitDBTransaction();
+
             } else {
+                await rollbackDBTransaction();
                 throw new NoWeb3Exception(sender + " can't spend more than it owns!");
             }
         } else {
@@ -61,7 +75,14 @@ class ERC20 {
      */
     mint = async (receiver, amount) => {
         if (amount > 0) {
-            await insertTransaction("", receiver, amount, this.symbol, new Date());
+            await createDBTransaction();
+
+            const trx_time = new Date();
+            const receiverBalance = await this.balanceOf(receiver);
+            await updateBalanceOfUser(receiver, this.symbol, trx_time, receiverBalance + amount);
+            await insertTransaction("", receiver, amount, this.symbol, trx_time);
+
+            await commitDBTransaction();
         } else {
             throw new NoWeb3Exception("Spending negative amounts is not possible!");
         }
@@ -76,10 +97,18 @@ class ERC20 {
      */
     burn = async (sponsor, amount) => {
         if (amount > 0) {
+            await createDBTransaction();
+
             const senderBalance = await this.balanceOf(sponsor);
             if (senderBalance >= amount) {
-                await insertTransaction(sponsor, "", amount, this.symbol, new Date());
+                const trx_time = new Date();
+
+                await updateBalanceOfUser(sponsor, this.symbol, trx_time,senderBalance - amount);
+                await insertTransaction(sponsor, "", amount, this.symbol, trx_time);
+
+                await commitDBTransaction();
             } else {
+                await rollbackDBTransaction();
                 throw new NoWeb3Exception(sponsor + " can't burn more than it owns!");
             }
         } else {

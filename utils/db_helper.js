@@ -13,7 +13,73 @@ client.connect()
 
 async function setupDatabase() {
     await client.query('CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount integer not null, symbol varchar(255) not null, trx_timestamp timestamp not null)');
-    await client.query('CREATE TABLE IF NOT EXISTS bet_reports (ID SERIAL PRIMARY KEY, bet_id varchar(255) not null, reporter varchar(255) not null, outcome varchar(3) not null, report_timestamp timestamp not null, unique(bet_id))');
+    await client.query('CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance integer not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol))');
+    await client.query('CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome varchar(3) not null, report_timestamp timestamp not null)');
+}
+
+async function teardownDatabase() {
+    await client.query('DROP TABLE token_transactions;');
+    await client.query('DROP TABLE token_balances;');
+    await client.query('DROP TABLE bet_reports;');
+}
+
+async function createDBTransaction() {
+    await client.query('BEGIN');
+}
+
+async function commitDBTransaction() {
+    await client.query('COMMIT');
+}
+
+async function rollbackDBTransaction() {
+    await client.query('ROLLBACK');
+}
+
+/**
+ * Get the balance of a specific token from a user
+ *
+ * @param user {String}
+ * @param symbol {String}
+ * @returns {Promise<*>}
+ */
+async function getBalanceOfUser(user, symbol) {
+    const res = await client.query('SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2', [symbol, user]);
+    return res.rows;
+}
+
+/**
+ * Get the balance of a specific token from a user
+ *
+ * @param user {String}
+ * @returns {Promise<*>}
+ */
+async function getAllBalancesOfUser(user) {
+    const res = await client.query('SELECT * FROM token_balances WHERE owner = $1', [user]);
+    return res.rows;
+}
+
+/**
+ * Get the balance of a specific token
+ *
+ * @param symbol {String}
+ * @returns {Promise<*>}
+ */
+async function getAllBalancesOfToken(symbol) {
+    const res = await client.query('SELECT * FROM token_balances WHERE symbol = $1', [symbol]);
+    return res.rows;
+}
+
+/**
+ * Update the balance of a specific token from a user
+ *
+ * @param user {String}
+ * @param symbol {String}
+ * @param timestamp {Date}
+ * @param newBalance {number}
+ * @returns {Promise<void>}
+ */
+async function updateBalanceOfUser(user, symbol,timestamp, newBalance) {
+    await client.query('INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = $4;', [user, symbol, timestamp, newBalance]);
 }
 
 async function insertTransaction(sender, receiver, amount, symbol, timestamp) {
@@ -56,4 +122,17 @@ async function getReport(bet_id) {
     return res.rows;
 }
 
-module.exports = {setupDatabase, insertTransaction, getTransactionOfUser, insertReport, getReport};
+module.exports = {
+    setupDatabase,
+    teardownDatabase,
+    createDBTransaction,
+    commitDBTransaction,
+    rollbackDBTransaction,
+    getBalanceOfUser,
+    getAllBalancesOfUser,
+    updateBalanceOfUser,
+    insertTransaction,
+    getTransactionOfUser,
+    insertReport,
+    getReport
+};
