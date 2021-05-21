@@ -4,6 +4,7 @@ const {
     rollbackDBTransaction,
     insertTransaction,
     getBalanceOfUser,
+    viewBalanceOfUser,
     updateBalanceOfUser
 } = require('../utils/db_helper');
 const NoWeb3Exception = require('./Exception.noblock');
@@ -25,7 +26,7 @@ class ERC20 {
      * @returns {Promise<number>}
      */
     balanceOf = async (user) => {
-        const results = await getBalanceOfUser(user, this.symbol);
+        const results = await viewBalanceOfUser(user, this.symbol);
         let balance = 0;
         if (results.length > 0) {
             balance = results[0].balance;
@@ -43,22 +44,21 @@ class ERC20 {
      */
     transfer = async (sender, receiver, amount) => {
         if (amount > 0) {
-            await createDBTransaction();
+            const dbClient = await createDBTransaction();
 
-            const senderBalance = await this.balanceOf(sender);
+            const senderBalance = await this._balanceOf(dbClient, sender);
             if (senderBalance >= amount) {
-                const receiverBalance = await this.balanceOf(receiver);
+                const receiverBalance = await this._balanceOf(dbClient, receiver);
 
                 const trx_time = new Date();
 
-                await updateBalanceOfUser(sender, this.symbol, trx_time, senderBalance - amount);
-                await updateBalanceOfUser(receiver, this.symbol, trx_time, receiverBalance + amount);
-                await insertTransaction(sender, receiver, amount, this.symbol, trx_time);
+                await updateBalanceOfUser(dbClient, sender, this.symbol, trx_time, senderBalance - amount);
+                await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
+                await insertTransaction(dbClient, sender, receiver, amount, this.symbol, trx_time);
 
-                await commitDBTransaction();
-
+                await commitDBTransaction(dbClient);
             } else {
-                await rollbackDBTransaction();
+                await rollbackDBTransaction(dbClient);
                 throw new NoWeb3Exception(sender + " can't spend more than it owns!");
             }
         } else {
@@ -75,14 +75,14 @@ class ERC20 {
      */
     mint = async (receiver, amount) => {
         if (amount > 0) {
-            await createDBTransaction();
+            const dbClient = await createDBTransaction();
 
             const trx_time = new Date();
-            const receiverBalance = await this.balanceOf(receiver);
-            await updateBalanceOfUser(receiver, this.symbol, trx_time, receiverBalance + amount);
-            await insertTransaction("", receiver, amount, this.symbol, trx_time);
+            const receiverBalance = await this._balanceOf(dbClient, receiver);
+            await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
+            await insertTransaction(dbClient, "", receiver, amount, this.symbol, trx_time);
 
-            await commitDBTransaction();
+            await commitDBTransaction(dbClient);
         } else {
             throw new NoWeb3Exception("Spending negative amounts is not possible!");
         }
@@ -97,23 +97,32 @@ class ERC20 {
      */
     burn = async (sponsor, amount) => {
         if (amount > 0) {
-            await createDBTransaction();
+            const dbClient = await createDBTransaction();
 
-            const senderBalance = await this.balanceOf(sponsor);
+            const senderBalance = await this._balanceOf(dbClient, sponsor);
             if (senderBalance >= amount) {
                 const trx_time = new Date();
 
-                await updateBalanceOfUser(sponsor, this.symbol, trx_time,senderBalance - amount);
-                await insertTransaction(sponsor, "", amount, this.symbol, trx_time);
+                await updateBalanceOfUser(dbClient, sponsor, this.symbol, trx_time,senderBalance - amount);
+                await insertTransaction(dbClient, sponsor, "", amount, this.symbol, trx_time);
 
-                await commitDBTransaction();
+                await commitDBTransaction(dbClient);
             } else {
-                await rollbackDBTransaction();
+                await rollbackDBTransaction(dbClient);
                 throw new NoWeb3Exception(sponsor + " can't burn more than it owns!");
             }
         } else {
             throw new NoWeb3Exception("Burning negative amounts is not possible!");
         }
+    }
+
+    _balanceOf = async (client, user) => {
+        const results = await getBalanceOfUser(client, user, this.symbol);
+        let balance = 0;
+        if (results.length > 0) {
+            balance = results[0].balance;
+        }
+        return balance;
     }
 }
 
