@@ -6,6 +6,8 @@ const EVNT = new ERC20('EVNT');
 const liquidityProviderWallet = 'liquidity_provider';
 const initialLiquidityProviderBalance = 1000000;
 
+jest.setTimeout(10000);
+
 beforeEach(async () => {
     await setupDatabase();
 

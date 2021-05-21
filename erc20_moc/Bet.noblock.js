@@ -1,6 +1,6 @@
 const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
-const { insertReport, getReport } = require('../utils/db_helper');
+const { insertReport, viewReport } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = "EVNT";
 
@@ -117,7 +117,7 @@ class Bet {
     }
 
     getResult = async () => {
-        const result = await getReport(this.betId);
+        const result = await viewReport(this.betId);
         if (result.length === 0) {
             throw new NoWeb3Exception("The Bet is not resolved yet!");
         } else if (result.length > 1) {
@@ -127,7 +127,7 @@ class Bet {
     }
 
     isResolved = async () => {
-        const result = await getReport(this.betId);
+        const result = await viewReport(this.betId);
         return result.length !== 0;
     }
 
