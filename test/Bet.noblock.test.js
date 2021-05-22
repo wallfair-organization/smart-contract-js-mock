@@ -4,7 +4,7 @@ const Bet = require('../erc20_moc/Bet.noblock');
 
 const EVNT = new ERC20('EVNT');
 const liquidityProviderWallet = 'liquidity_provider';
-const initialLiquidityProviderBalance = 1000000;
+const initialLiquidityProviderBalance = 1000 * EVNT.ONE;
 
 jest.setTimeout(10000);
 
@@ -43,4 +43,15 @@ test('Resolve Bet', async () => {
     const result = await bet.getResult();
     expect(result['reporter']).toBe(betResolver);
     expect(result['outcome']).toBe(resolvedOutcome);
+});
+
+test('Check AMM', async () => {
+    const addLiquidityBetId = 'checkAmm';
+    const liquidityAmount = 100 * EVNT.ONE;
+
+    const bet = new Bet(addLiquidityBetId);
+    await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+    expect(await bet.calcBuy(10 * EVNT.ONE, "yes")).toBe(100000098990);
+    expect(await bet.calcBuy(10 * EVNT.ONE, "no")).toBe(100000098990);
 });

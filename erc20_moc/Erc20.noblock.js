@@ -17,11 +17,7 @@ class ERC20 {
      */
     constructor(symbol) {
         this.symbol = symbol;
-        if (this.symbol !== "EVNT") {
-            this.decimals = 0;
-        } else {
-            this.decimals = 18;
-        }
+        this.ONE = 10000;
     }
 
     /**
