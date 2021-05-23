@@ -2,11 +2,11 @@ const { Pool, Client } = require('pg');
 
 // ToDo: Put into Configfile
 const pool = new Pool({
-    user: 'postgres',
-    host: 'db.xtdpndzaaifgrbkbqsyg.supabase.co',
-    database: 'postgres',
-    password: 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
-    port: 6543,
+    user: process.env.POSTGRES_USER || 'postgres',
+    host: process.env.POSTGRES_HOST || 'db.xtdpndzaaifgrbkbqsyg.supabase.co',
+    database: process.env.POSTGRES_DB || 'postgres',
+    password: process.env.POSTGRES_PASSWORD || 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
+    port: process.env.POSTGRES_PORT || 6543,
 });
 
 /**
@@ -20,8 +20,8 @@ async function getConnection() {
  * @returns {Promise<void>}
  */
 async function setupDatabase() {
-    await pool.query('CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null)');
-    await pool.query('CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance bigint not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol))');
+    await pool.query('CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount int8 not null, symbol varchar(255) not null, trx_timestamp timestamp not null)');
+    await pool.query('CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance int8 not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol))');
     await pool.query('CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome varchar(3) not null, report_timestamp timestamp not null)');
 }
 

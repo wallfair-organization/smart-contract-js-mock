@@ -1,6 +1,9 @@
 const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
-const { insertReport, viewReport } = require('../utils/db_helper');
+const {
+    createDBTransaction,
+    commitDBTransaction, insertReport, viewReport
+} = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = "EVNT";
 
@@ -19,12 +22,17 @@ class Bet {
         this.yesToken = new ERC20(YES_TOKEN_PREFIX + this.betId);
         this.noToken = new ERC20(NO_TOKEN_PREFIX + this.betId);
         this.collateralToken = new ERC20(COLLATERAL_TOKEN);
+        this.ONE = this.collateralToken.ONE;
     }
 
     addLiquidity = async (provider, amount) => {
-        await this.collateralToken.transfer(provider, this.walletId, amount);
-        await this.yesToken.mint(this.walletId, amount);
-        await this.noToken.mint(this.walletId, amount);
+        const dbClient = await createDBTransaction();
+
+        await this.collateralToken.transferChain(dbClient, provider, this.walletId, amount);
+        await this.yesToken.mintChain(dbClient, this.walletId, amount);
+        await this.noToken.mintChain(dbClient, this.walletId, amount);
+
+        await commitDBTransaction(dbClient);
     }
 
     /**
@@ -44,7 +52,7 @@ class Bet {
             throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\", but is \"" + outcome + "\"");
         }
 
-        const investmentAmountMinusFees = investmentAmount - (investmentAmount * this.fee);
+        const investmentAmountMinusFees = investmentAmount - Math.ceil(investmentAmount * this.fee);
         const buyTokenPoolBalance = poolBalances[outcome];
         let endingOutcomeBalance = buyTokenPoolBalance;
 
@@ -104,16 +112,20 @@ class Bet {
             throw new NoWeb3Exception("The Bet is already resolved!");
         }
         const outcomeTokensToBuy = await this.calcBuy(investmentAmount, outcome);
-        const feeAmount = investmentAmount * this.fee;
-        const outcomeToken = { "yes": this.yesToken, "no": this.noToken }[outcome];
+        const feeAmount = Math.ceil(investmentAmount * this.fee);
+        const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
 
         if (outcomeTokensToBuy < minOutcomeTokensToBuy) {
             throw new NoWeb3Exception("Minimum buy amount not reached");
         }
 
-        await this.collateralToken.transfer(buyer, this.walletId, investmentAmount);
-        await this.collateralToken.transfer(this.walletId, this.feeWalletId, feeAmount);
-        await outcomeToken.transfer(this.walletId, buyer, outcomeTokensToBuy);
+        const dbClient = await createDBTransaction();
+
+        await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
+        await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
+        await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
+
+        await commitDBTransaction(dbClient);
     }
 
     getResult = async () => {
@@ -151,7 +163,7 @@ class Bet {
             throw new NoWeb3Exception("The Bet is not resolved yet!");
         }
         const outcome = (await this.getResult())['outcome'];
-        const outcomeToken = { "yes": this.yesToken, "no": this.noToken }[outcome];
+        const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
 
         const outcomeBalance = await outcomeToken.balanceOf(beneficiary);
 

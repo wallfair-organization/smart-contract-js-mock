@@ -30,7 +30,7 @@ class ERC20 {
         const results = await viewBalanceOfUser(user, this.symbol);
         let balance = 0;
         if (results.length > 0) {
-            balance = results[0].balance;
+            balance = parseInt(results[0].balance);
         }
         return balance;
     }
@@ -63,6 +63,56 @@ class ERC20 {
                 throw new NoWeb3Exception(sender + " can't spend more than it owns!");
             }
         } else {
+            throw new NoWeb3Exception("Spending negative amounts is not possible!");
+        }
+    }
+
+    /**
+     * Transfer tokens from one address to another
+     *
+     * @param dbClient {Client}
+     * @param sender {String}
+     * @param receiver {String}
+     * @param amount {number}
+     * @returns {Promise<void>}
+     */
+    transferChain = async (dbClient, sender, receiver, amount) => {
+        if (amount > 0) {
+            const senderBalance = await this._balanceOf(dbClient, sender);
+            if (senderBalance >= amount) {
+                const receiverBalance = await this._balanceOf(dbClient, receiver);
+
+                const trx_time = new Date();
+
+                await updateBalanceOfUser(dbClient, sender, this.symbol, trx_time, senderBalance - amount);
+                await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
+                await insertTransaction(dbClient, sender, receiver, amount, this.symbol, trx_time);
+            } else {
+                await rollbackDBTransaction(dbClient);
+                throw new NoWeb3Exception(sender + " can't spend more than it owns!");
+            }
+        } else {
+            await rollbackDBTransaction(dbClient);
+            throw new NoWeb3Exception("Spending negative amounts is not possible!");
+        }
+    }
+
+    /**
+     * Mint new tokens and add them to an address
+     *
+     * @param dbClient {Client}
+     * @param receiver {String}
+     * @param amount {number}
+     * @returns {Promise<void>}
+     */
+    mintChain = async (dbClient, receiver, amount) => {
+        if (amount > 0) {
+            const trx_time = new Date();
+            const receiverBalance = await this._balanceOf(dbClient, receiver);
+            await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
+            await insertTransaction(dbClient, "", receiver, amount, this.symbol, trx_time);
+        } else {
+            await rollbackDBTransaction(dbClient);
             throw new NoWeb3Exception("Spending negative amounts is not possible!");
         }
     }
@@ -121,7 +171,7 @@ class ERC20 {
         const results = await getBalanceOfUser(client, user, this.symbol);
         let balance = 0;
         if (results.length > 0) {
-            balance = results[0].balance;
+            balance = parseInt(results[0].balance);
         }
         return balance;
     }

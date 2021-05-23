@@ -52,6 +52,6 @@ test('Check AMM', async () => {
     const bet = new Bet(addLiquidityBetId);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
-    expect(await bet.calcBuy(10 * EVNT.ONE, "yes")).toBe(100000098990);
-    expect(await bet.calcBuy(10 * EVNT.ONE, "no")).toBe(100000098990);
+    expect(await bet.calcBuy(10 * EVNT.ONE, "yes")).toBeLessThan(liquidityAmount);
+    expect(await bet.calcBuy(10 * EVNT.ONE, "no")).toBeLessThan(liquidityAmount);
 });
