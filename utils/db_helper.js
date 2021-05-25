@@ -40,6 +40,7 @@ async function teardownDatabase() {
 async function createDBTransaction() {
     const client = await getConnection();
     await client.query('BEGIN');
+    await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     return client;
 }
 
