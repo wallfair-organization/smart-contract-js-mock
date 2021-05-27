@@ -2,7 +2,9 @@ const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
 const {
     createDBTransaction,
-    commitDBTransaction, insertReport, viewReport
+    rollbackDBTransaction,
+    commitDBTransaction,
+    insertReport, viewReport
 } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = "EVNT";
@@ -27,12 +29,16 @@ class Bet {
 
     addLiquidity = async (provider, amount) => {
         const dbClient = await createDBTransaction();
+        try {
+            await this.collateralToken.transferChain(dbClient, provider, this.walletId, amount);
+            await this.yesToken.mintChain(dbClient, this.walletId, amount);
+            await this.noToken.mintChain(dbClient, this.walletId, amount);
 
-        await this.collateralToken.transferChain(dbClient, provider, this.walletId, amount);
-        await this.yesToken.mintChain(dbClient, this.walletId, amount);
-        await this.noToken.mintChain(dbClient, this.walletId, amount);
-
-        await commitDBTransaction(dbClient);
+            await commitDBTransaction(dbClient);
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
     }
 
     /**
@@ -121,11 +127,16 @@ class Bet {
 
         const dbClient = await createDBTransaction();
 
-        await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
-        await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
-        await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
+        try {
+            await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
+            await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
+            await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
 
-        await commitDBTransaction(dbClient);
+            await commitDBTransaction(dbClient);
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
     }
 
     getResult = async () => {
@@ -165,11 +176,19 @@ class Bet {
         const outcome = (await this.getResult())['outcome'];
         const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
 
-        const outcomeBalance = await outcomeToken.balanceOf(beneficiary);
+        const dbClient = await createDBTransaction();
 
-        await outcomeToken.burn(beneficiary, outcomeBalance);
-        await this.collateralToken.transfer(this.walletId, beneficiary, outcomeBalance);
+        try {
+            const outcomeBalance = await outcomeToken.balanceOfChain(dbClient, beneficiary);
 
+            await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
+            await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
+
+            await commitDBTransaction(dbClient);
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
     }
 }
 
