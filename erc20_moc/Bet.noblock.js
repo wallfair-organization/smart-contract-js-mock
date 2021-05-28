@@ -74,6 +74,39 @@ class Bet {
     }
 
     /**
+     * Calculate the amount of outcome-tokens able to buy using the investment amount
+     *
+     * @param dbClient {Client}
+     * @param investmentAmount {number}
+     * @param outcome {"yes" | "no"}
+     * @returns {Promise<number>}
+     */
+    calcBuyChain = async (dbClient, investmentAmount, outcome) => {
+        const poolBalances = {
+            "yes": await this.yesToken.balanceOfChain(dbClient, this.walletId),
+            "no": await this.noToken.balanceOfChain(dbClient, this.walletId),
+        };
+
+        if (!Object.keys(poolBalances).includes(outcome)) {
+            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\", but is \"" + outcome + "\"");
+        }
+
+        const investmentAmountMinusFees = investmentAmount - Math.ceil(investmentAmount * this.fee);
+        const buyTokenPoolBalance = poolBalances[outcome];
+        let endingOutcomeBalance = buyTokenPoolBalance;
+
+        for (let i = 0; i < Object.keys(poolBalances).length; i++) {
+            const poolBalanceKey = Object.keys(poolBalances)[i];
+            if (poolBalanceKey !== outcome) {
+                const poolBalance = poolBalances[poolBalanceKey];
+                endingOutcomeBalance = Math.ceil((endingOutcomeBalance * poolBalance) / (poolBalance + investmentAmountMinusFees));
+            }
+        }
+
+        return buyTokenPoolBalance + investmentAmountMinusFees - endingOutcomeBalance;
+    }
+
+    /**
      * Calculate the amount of outcome-tokens required to sell for the requested return amount
      *
      * @param returnAmount {number}
@@ -117,17 +150,19 @@ class Bet {
         if (await this.isResolved()) {
             throw new NoWeb3Exception("The Bet is already resolved!");
         }
-        const outcomeTokensToBuy = await this.calcBuy(investmentAmount, outcome);
-        const feeAmount = Math.ceil(investmentAmount * this.fee);
-        const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
-
-        if (outcomeTokensToBuy < minOutcomeTokensToBuy) {
-            throw new NoWeb3Exception("Minimum buy amount not reached");
-        }
 
         const dbClient = await createDBTransaction();
 
         try {
+
+            const outcomeTokensToBuy = await this.calcBuyChain(dbClient, investmentAmount, outcome);
+            const feeAmount = Math.ceil(investmentAmount * this.fee);
+            const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
+
+            if (outcomeTokensToBuy < minOutcomeTokensToBuy) {
+                throw new NoWeb3Exception("Minimum buy amount not reached");
+            }
+
             await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
             await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
