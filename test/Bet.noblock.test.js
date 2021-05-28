@@ -46,12 +46,29 @@ test('Resolve Bet', async () => {
 });
 
 test('Check AMM', async () => {
-    const addLiquidityBetId = 'checkAmm';
+    const checkAmmBetId = 'checkAmm';
     const liquidityAmount = 100 * EVNT.ONE;
 
-    const bet = new Bet(addLiquidityBetId);
+    const bet = new Bet(checkAmmBetId);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     expect(await bet.calcBuy(10 * EVNT.ONE, "yes")).toBeLessThan(liquidityAmount);
     expect(await bet.calcBuy(10 * EVNT.ONE, "no")).toBeLessThan(liquidityAmount);
+});
+
+test('Buy Outcome Tokens', async () => {
+    const buyOutcomeTokensBetId = 'buyOutcomeTokens';
+    const investorWalletId = 'buyOutcomeTokensInvestor';
+    const liquidityAmount = 100 * EVNT.ONE;
+    const investAmount = 10 * EVNT.ONE;
+
+    await EVNT.mint(investorWalletId, investAmount);
+
+    const bet = new Bet(buyOutcomeTokensBetId);
+    await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+    const expectedOutcomeTokens = await bet.calcBuy(investAmount, "yes");
+    await bet.buy(investorWalletId, investAmount, "yes", 1);
+
+    expect(await bet.yesToken.balanceOf(investorWalletId)).toBeGreaterThan(expectedOutcomeTokens - 10);
 });
