@@ -7,7 +7,9 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
     port: process.env.POSTGRES_PORT || 6543,
-    ssl: process.env.POSTGRES_SSL || false
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 /**
