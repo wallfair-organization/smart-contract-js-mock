@@ -193,7 +193,6 @@ async function viewReport(bet_id) {
 }
 
 module.exports = {
-    getConnection,
     setupDatabase,
     teardownDatabase,
     createDBTransaction,
