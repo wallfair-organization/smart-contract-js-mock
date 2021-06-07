@@ -109,6 +109,39 @@ class Bet {
     /**
      * Calculate the amount of outcome-tokens required to sell for the requested return amount
      *
+     * @param dbClient {Client}
+     * @param returnAmount {number}
+     * @param outcome {"yes" | "no"}
+     * @returns {Promise<number>}
+     */
+    calcSellChain = async (dbClient, returnAmount, outcome) => {
+        const poolBalances = {
+            "yes": await this.yesToken.balanceOfChain(dbClient, this.walletId),
+            "no": await this.noToken.balanceOfChain(dbClient, this.walletId),
+        };
+
+        if (!Object.keys(poolBalances).includes(outcome)) {
+            throw new NoWeb3Exception("The outcome needs to be either \"yes\" or \"no\", but is \"" + outcome + "\"");
+        }
+
+        const returnAmountPlusFees = returnAmount + (returnAmount * this.fee);
+        const sellTokenPoolBalance = poolBalances[outcome];
+        let endingOutcomeBalance = sellTokenPoolBalance;
+
+        for (let i = 0; i < Object.keys(poolBalances).length; i++) {
+            const poolBalanceKey = Object.keys(poolBalances)[i];
+            if (poolBalanceKey !== outcome) {
+                const poolBalance = poolBalances[poolBalanceKey];
+                endingOutcomeBalance = Math.ceil((endingOutcomeBalance * poolBalance) / (poolBalance - returnAmountPlusFees));
+            }
+        }
+
+        return returnAmountPlusFees + endingOutcomeBalance - sellTokenPoolBalance;
+    }
+
+    /**
+     * Calculate the amount of outcome-tokens required to sell for the requested return amount
+     *
      * @param returnAmount {number}
      * @param outcome {"yes" | "no"}
      * @returns {Promise<number>}
@@ -166,6 +199,42 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
             await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
+
+            await commitDBTransaction(dbClient);
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
+    }
+
+    /**
+     *
+     * @param seller {String}
+     * @param returnAmount {number}
+     * @param outcome {"yes" | "no"}
+     * @param maxOutcomeTokensToSell {number}
+     * @returns {Promise<void>}
+     */
+    sell = async (seller, returnAmount, outcome, maxOutcomeTokensToSell) => {
+        if (await this.isResolved()) {
+            throw new NoWeb3Exception("The Bet is already resolved!");
+        }
+
+        const dbClient = await createDBTransaction();
+
+        try {
+
+            const outcomeTokensToSell = await this.calcSellChain(dbClient, returnAmount, outcome);
+            const feeAmount = Math.ceil(returnAmount * this.fee);
+            const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
+
+            if (outcomeTokensToSell > maxOutcomeTokensToSell) {
+                throw new NoWeb3Exception("Maximum sell amount surpassed");
+            }
+
+            await outcomeToken.transferChain(dbClient, seller, this.walletId, outcomeTokensToSell);
+            await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
+            await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
 
             await commitDBTransaction(dbClient);
         } catch (e) {
