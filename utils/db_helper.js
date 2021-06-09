@@ -54,7 +54,7 @@ async function createDBTransaction() {
  */
 async function commitDBTransaction(client) {
     await client.query('COMMIT');
-    client.end();
+    client.release();
 }
 
 /**
@@ -63,7 +63,7 @@ async function commitDBTransaction(client) {
  */
 async function rollbackDBTransaction(client) {
     await client.query('ROLLBACK');
-    client.end();
+    client.release();
 }
 
 /**

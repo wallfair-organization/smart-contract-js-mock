@@ -10,7 +10,6 @@ const investAmount = 10 * EVNT.ONE;
 jest.setTimeout(1000000);
 
 beforeAll(async () => {
-    await teardownDatabase();
     await setupDatabase();
 })
 
