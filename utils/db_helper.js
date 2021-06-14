@@ -1,4 +1,4 @@
-const { Pool, Client } = require('pg');
+const {Pool, Client} = require('pg');
 
 // ToDo: Put into Configfile
 const pool = new Pool({
@@ -7,9 +7,7 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
     port: process.env.POSTGRES_PORT || 6543,
-    ssl: process.env.POSTGRES_DISABLE_SSL && false || {
-        rejectUnauthorized: false
-    }
+    ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {rejectUnauthorized: false})
 });
 
 /**
@@ -147,7 +145,7 @@ async function viewAllBalancesOfToken(symbol) {
  * @param newBalance {number}
  * @returns {Promise<void>}
  */
-async function updateBalanceOfUser(client, user, symbol,timestamp, newBalance) {
+async function updateBalanceOfUser(client, user, symbol, timestamp, newBalance) {
     await client.query('INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = $4;', [user, symbol, timestamp, newBalance]);
 }
 
