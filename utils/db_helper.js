@@ -127,10 +127,11 @@ async function getAllBalancesOfToken(client, symbol) {
  * View the balance of a specific token
  *
  * @param symbol {String}
+ * @param limit {number}
  * @returns {Promise<*>}
  */
-async function viewAllBalancesOfToken(symbol) {
-    const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1', [symbol]);
+async function viewAllBalancesOfToken(symbol, limit) {
+    const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1 ORDER BY balance DESC LIMIT $2', [symbol, limit]);
     return res.rows;
 }
 
@@ -234,6 +235,8 @@ module.exports = {
     viewBalanceOfUser,
     getAllBalancesOfUser,
     viewAllBalancesOfUser,
+    getAllBalancesOfToken,
+    viewAllBalancesOfToken,
     updateBalanceOfUser,
     insertTransaction,
     getTransactionOfUserBySymbol,
