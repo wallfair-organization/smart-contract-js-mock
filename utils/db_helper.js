@@ -3,10 +3,10 @@ const {Pool, Client} = require('pg');
 // ToDo: Put into Configfile
 const pool = new Pool({
     user: process.env.POSTGRES_USER || 'postgres',
-    host: process.env.POSTGRES_HOST || 'db.xtdpndzaaifgrbkbqsyg.supabase.co',
+    host: process.env.POSTGRES_HOST || 'db.qscoxswxnvdajazopzcd.supabase.co',
     database: process.env.POSTGRES_DB || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
-    port: process.env.POSTGRES_PORT || 6543,
+    port: process.env.POSTGRES_PORT || 5432,
     ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {rejectUnauthorized: false})
 });
 
@@ -44,7 +44,6 @@ async function createDBTransaction() {
     await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     return client;
 }
-
 
 /**
  * @param client {Client}
@@ -161,8 +160,43 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @param symbol {String}
  * @returns {Promise<*>}
  */
-async function getTransactionOfUser(client, user, symbol) {
+async function getTransactionOfUserBySymbol(client, user, symbol) {
     const res = await client.query('SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2)', [symbol, user]);
+    return res.rows;
+}
+
+/**
+ * Get all transactions of a user with a specific token
+ *
+ * @param client {Client}
+ * @param user {String}
+ * @returns {Promise<*>}
+ */
+async function getTransactionOfUser(client, user) {
+    const res = await client.query('SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1)', [user]);
+    return res.rows;
+}
+
+/**
+ * Get all transactions of a user with a specific token
+ *
+ * @param user {String}
+ * @param symbol {String}
+ * @returns {Promise<*>}
+ */
+async function viewTransactionOfUserBySymbol(user, symbol) {
+    const res = await pool.query('SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2)', [symbol, user]);
+    return res.rows;
+}
+
+/**
+ * Get all transactions of a user with a specific token
+ *
+ * @param user {String}
+ * @returns {Promise<*>}
+ */
+async function viewTransactionOfUser(user) {
+    const res = await pool.query('SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1)', [user]);
     return res.rows;
 }
 
@@ -202,7 +236,10 @@ module.exports = {
     viewAllBalancesOfUser,
     updateBalanceOfUser,
     insertTransaction,
+    getTransactionOfUserBySymbol,
     getTransactionOfUser,
+    viewTransactionOfUserBySymbol,
+    viewTransactionOfUser,
     insertReport,
     viewReport
 };
