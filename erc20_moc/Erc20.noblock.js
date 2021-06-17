@@ -233,5 +233,4 @@ class ERC20 {
     }
 }
 
-module
-    .exports = ERC20;
+module.exports = ERC20;
