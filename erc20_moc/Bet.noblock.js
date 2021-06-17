@@ -172,6 +172,43 @@ class Bet {
     }
 
     /**
+     * Calculate the amount of EVNT-tokens returned for the requested sell amount
+     *
+     * @param sellAmount {number}
+     * @param outcome {"yes" | "no"}
+     * @returns {Promise<number>}
+     */
+    calcSellFromAmount = async (sellAmount, outcome) => {
+        const dbClient = await createDBTransaction();
+        const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
+
+        const marginalR = Math.ceil(await this.calcSellChain(dbClient, this.collateralToken.ONE, outcome));
+        const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
+
+        let maximumRange = marginalPrice * sellAmount
+        let minimumRange = 0
+        let midRange = 0;
+
+        while (minimumRange <= maximumRange) {
+            midRange = Math.ceil((minimumRange + maximumRange) / 2)
+
+            const approxSell = Math.ceil(await this.calcSellChain(dbClient, midRange, outcome));
+            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
+                break;
+            }
+            if (approxSell < sellAmount) {
+                minimumRange = midRange
+            } else {
+                maximumRange = midRange
+            }
+        }
+
+        await commitDBTransaction(dbClient);
+
+        return midRange;
+    }
+
+    /**
      *
      * @param buyer {String}
      * @param investmentAmount {number}
