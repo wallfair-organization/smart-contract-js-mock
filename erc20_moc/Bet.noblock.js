@@ -179,7 +179,41 @@ class Bet {
      * @returns {Promise<number>}
      */
     calcSellFromAmount = async (sellAmount, outcome) => {
-        const dbClient = await createDBTransaction();
+        const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
+
+        const marginalR = Math.ceil(await this.calcSell(this.collateralToken.ONE, outcome));
+        const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
+
+        let maximumRange = marginalPrice * sellAmount
+        let minimumRange = 0
+        let midRange = 0;
+
+        while (minimumRange <= maximumRange) {
+            midRange = Math.ceil((minimumRange + maximumRange) / 2)
+
+            const approxSell = Math.ceil(await this.calcSell(midRange, outcome));
+            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
+                break;
+            }
+            if (approxSell < sellAmount) {
+                minimumRange = midRange
+            } else {
+                maximumRange = midRange
+            }
+        }
+
+        return midRange;
+    }
+
+    /**
+     * Calculate the amount of EVNT-tokens returned for the requested sell amount
+     *
+     * @param dbClient {Client}
+     * @param sellAmount {number}
+     * @param outcome {"yes" | "no"}
+     * @returns {Promise<number>}
+     */
+    calcSellFromAmountChain = async (dbClient, sellAmount, outcome) => {
         const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
 
         const marginalR = Math.ceil(await this.calcSellChain(dbClient, this.collateralToken.ONE, outcome));
@@ -202,8 +236,6 @@ class Bet {
                 maximumRange = midRange
             }
         }
-
-        await commitDBTransaction(dbClient);
 
         return midRange;
     }
@@ -270,6 +302,41 @@ class Bet {
             }
 
             await outcomeToken.transferChain(dbClient, seller, this.walletId, outcomeTokensToSell);
+            await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
+            await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
+
+            await commitDBTransaction(dbClient);
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
+    }
+
+    /**
+     *
+     * @param seller {String}
+     * @param sellAmount {number}
+     * @param outcome {"yes" | "no"}
+     * @param minReturnAmount {number}
+     * @returns {Promise<void>}
+     */
+    sellAmount = async (seller, sellAmount, outcome, minReturnAmount) => {
+        if (await this.isResolved()) {
+            throw new NoWeb3Exception("The Bet is already resolved!");
+        }
+
+        const dbClient = await createDBTransaction();
+
+        try {
+            const returnAmount = await this.calcSellFromAmountChain(dbClient, sellAmount, outcome);
+            const feeAmount = Math.ceil(sellAmount * this.fee);
+            const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
+
+            if (returnAmount < minReturnAmount) {
+                throw new NoWeb3Exception("Minimum return amount not reached");
+            }
+
+            await outcomeToken.transferChain(dbClient, seller, this.walletId, sellAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
 
