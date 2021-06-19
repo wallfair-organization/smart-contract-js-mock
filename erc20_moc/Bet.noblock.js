@@ -181,6 +181,7 @@ class Bet {
     calcSellFromAmount = async (sellAmount, outcome) => {
         const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
 
+        const precision = 5;
         const marginalR = Math.ceil(await this.calcSell(this.collateralToken.ONE, outcome));
         const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
 
@@ -192,7 +193,7 @@ class Bet {
             midRange = Math.ceil((minimumRange + maximumRange) / 2)
 
             const approxSell = Math.ceil(await this.calcSell(midRange, outcome));
-            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
+            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= precision)) {
                 break;
             }
             if (approxSell < sellAmount) {
@@ -216,6 +217,7 @@ class Bet {
     calcSellFromAmountChain = async (dbClient, sellAmount, outcome) => {
         const outcomeToken = {"yes": this.yesToken, "no": this.noToken}[outcome];
 
+        const precision = 5;
         const marginalR = Math.ceil(await this.calcSellChain(dbClient, this.collateralToken.ONE, outcome));
         const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
 
@@ -227,7 +229,7 @@ class Bet {
             midRange = Math.ceil((minimumRange + maximumRange) / 2)
 
             const approxSell = Math.ceil(await this.calcSellChain(dbClient, midRange, outcome));
-            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
+            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= precision)) {
                 break;
             }
             if (approxSell < sellAmount) {
