@@ -29,7 +29,6 @@ class Wallet {
         let result = 0;
         if (interactions.length > 0) {
             for (const interaction of interactions) {
-                console.log(interaction);
                 if (interaction.direction === "SELL") {
                     result -= parseInt(interaction.amount);
                 } else {
