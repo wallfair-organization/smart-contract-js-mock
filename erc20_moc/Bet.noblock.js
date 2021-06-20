@@ -347,6 +347,8 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
 
+            await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, outcomeTokensToSell, new Date());
+
             await commitDBTransaction(dbClient);
         } catch (e) {
             await rollbackDBTransaction(dbClient);
