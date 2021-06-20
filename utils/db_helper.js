@@ -24,6 +24,7 @@ async function setupDatabase() {
     await pool.query('CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount int8 not null, symbol varchar(255) not null, trx_timestamp timestamp not null)');
     await pool.query('CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance int8 not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol))');
     await pool.query('CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome varchar(3) not null, report_timestamp timestamp not null)');
+    await pool.query('CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome varchar(3) NOT NULL, direction varchar(10) NOT NULL, investmentAmount int8 NOT NULL, feeAmount int8 NOT NULL, outcomeTokensBought int8 NOT NULL, trx_timestamp timestamp NOT NULL)');
 }
 
 /**
@@ -85,6 +86,17 @@ async function getBalanceOfUser(client, user, symbol) {
  */
 async function viewBalanceOfUser(user, symbol) {
     const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2', [symbol, user]);
+    return res.rows;
+}
+
+/**
+ * View the Amm Interactions of a user
+ *
+ * @param user {String}
+ * @returns {Promise<*>}
+ */
+async function viewAMMInteractionsOfUser(user) {
+    const res = await pool.query('SELECT * FROM amm_interactions WHERE buyer = $1', [user]);
     return res.rows;
 }
 
@@ -154,6 +166,23 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
 }
 
 /**
+ *
+ * @param client {Client}
+ * @param buyer {String}
+ * @param bet {String}
+ * @param outcome {String}
+ * @param direction {String}
+ * @param investmentAmount {number}
+ * @param feeAmount {number}
+ * @param outcomeTokensBought {number}
+ * @param trx_timestamp
+ * @returns {Promise<void>}
+ */
+async function insertAMMInteraction(client, buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp) {
+    await client.query('INSERT INTO amm_interactions(buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp) VALUES($1, $2, $3, $4, $5, $6, $7, $8)', [buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp]);
+}
+
+/**
  * Get all transactions of a user with a specific token
  *
  * @param client {Client}
@@ -202,6 +231,19 @@ async function viewTransactionOfUser(user) {
 }
 
 /**
+ * Get all transactions of a user with a specific token
+ *
+ * @param user {String}
+ * @param bet {String}
+ * @param outcome {String}
+ * @returns {Promise<*>}
+ */
+async function viewUserInvestment(user, bet, outcome) {
+    const res = await pool.query('SELECT buyer, bet, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction', [user, bet, outcome]);
+    return res.rows;
+}
+
+/**
  * Insert a new Report to resolve a bet
  *
  * @param bet_id {String}
@@ -233,16 +275,19 @@ module.exports = {
     rollbackDBTransaction,
     getBalanceOfUser,
     viewBalanceOfUser,
+    viewAMMInteractionsOfUser,
     getAllBalancesOfUser,
     viewAllBalancesOfUser,
     getAllBalancesOfToken,
     viewAllBalancesOfToken,
     updateBalanceOfUser,
     insertTransaction,
+    insertAMMInteraction,
     getTransactionOfUserBySymbol,
     getTransactionOfUser,
     viewTransactionOfUserBySymbol,
     viewTransactionOfUser,
     insertReport,
-    viewReport
+    viewReport,
+    viewUserInvestment
 };
