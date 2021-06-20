@@ -4,6 +4,7 @@ const {
     createDBTransaction,
     rollbackDBTransaction,
     commitDBTransaction,
+    insertAMMInteraction,
     insertReport, viewReport
 } = require('../utils/db_helper');
 
@@ -271,6 +272,8 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
             await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
 
+            await insertAMMInteraction(dbClient, buyer, this.betId, outcome, "BUY", investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
+
             await commitDBTransaction(dbClient);
         } catch (e) {
             await rollbackDBTransaction(dbClient);
@@ -306,6 +309,8 @@ class Bet {
             await outcomeToken.transferChain(dbClient, seller, this.walletId, outcomeTokensToSell);
             await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
+
+            await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, outcomeTokensToSell, new Date());
 
             await commitDBTransaction(dbClient);
         } catch (e) {

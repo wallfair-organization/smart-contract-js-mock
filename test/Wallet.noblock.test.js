@@ -1,5 +1,6 @@
 const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
+const Bet = require('../erc20_moc/Bet.noblock');
 const Wallet = require('../erc20_moc/Wallet.noblock');
 
 const tokenName = 'EVNT';
@@ -70,4 +71,26 @@ test('Get Balance of Wallet', async () => {
     expect(balances.length).toBe(2);
     expect(TEST_balance).toBe(tokensToMint);
     expect(EVNT_balance).toBe(tokensToMint);
+});
+
+
+test('Test AMM Interactions', async () => {
+    const betId = 'testAMMInteractionsOutcome';
+    const testWallet = 'testAMMInteractions';
+    const investAmount = 10 * EVNT.ONE;
+
+    await EVNT.mint(betId, 100 * EVNT.ONE);
+    await EVNT.mint(testWallet, investAmount);
+
+    const bet = new Bet(betId);
+    await bet.addLiquidity(betId, 100 * EVNT.ONE);
+
+    await bet.buy(testWallet, investAmount, "yes", 1);
+
+    await bet.sell(testWallet, 5 * EVNT.ONE, "yes");
+    await bet.sell(testWallet, 2 * EVNT.ONE, "yes");
+
+    const wallet = new Wallet(testWallet);
+
+    expect(await wallet.investmentBet(betId, "yes")).toBe(3 * EVNT.ONE)
 });
