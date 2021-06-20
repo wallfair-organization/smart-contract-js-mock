@@ -349,7 +349,14 @@ class Bet {
 
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, sellAmount, new Date());
 
+            const newBalances = {
+                yes: await this.yesToken.balanceOfChain(dbClient, seller),
+                no: await this.noToken.balanceOfChain(dbClient, seller)
+            }
+
             await commitDBTransaction(dbClient);
+
+            return newBalances;
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
