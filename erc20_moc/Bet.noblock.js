@@ -286,7 +286,7 @@ class Bet {
      * @param investmentAmount {number}
      * @param outcome {number}
      * @param minOutcomeTokensToBuy {number}
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     buy = async (buyer, investmentAmount, outcome, minOutcomeTokensToBuy) => {
         if (await this.isResolved()) {
@@ -311,7 +311,13 @@ class Bet {
 
             await insertAMMInteraction(dbClient, buyer, this.betId, outcome, "BUY", investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
 
+            const newBalances = await this.getWalletBalancesChain(dbClient, buyer);
+            newBalances['boughtOutcomeTokens'] = outcomeTokensToBuy;
+            newBalances['spendTokens'] = investmentAmount;
+
             await commitDBTransaction(dbClient);
+
+            return newBalances;
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
@@ -324,7 +330,7 @@ class Bet {
      * @param returnAmount {number}
      * @param outcome {number}
      * @param maxOutcomeTokensToSell {number}
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     sell = async (seller, returnAmount, outcome, maxOutcomeTokensToSell) => {
         if (await this.isResolved()) {
@@ -349,7 +355,13 @@ class Bet {
 
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, outcomeTokensToSell, new Date());
 
+            const newBalances = await this.getWalletBalancesChain(dbClient, seller);
+            newBalances['soldOutcomeTokens'] = outcomeTokensToSell;
+            newBalances['earnedTokens'] = returnAmount;
+
             await commitDBTransaction(dbClient);
+
+            return newBalances;
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
@@ -387,6 +399,8 @@ class Bet {
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, sellAmount, new Date());
 
             const newBalances = await this.getWalletBalancesChain(dbClient, seller);
+            newBalances['soldOutcomeTokens'] = sellAmount;
+            newBalances['earnedTokens'] = returnAmount;
 
             await commitDBTransaction(dbClient);
 
