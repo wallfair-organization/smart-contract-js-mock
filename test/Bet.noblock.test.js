@@ -68,8 +68,10 @@ test('Check AMM Test', async () => {
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const result = await bet.calcSell(5 * EVNT.ONE, 0);
+    const result2 = await bet.calcSell(3 * EVNT.ONE, 0);
 
-    expect(await bet.calcSellFromAmount(result, 0)).toBeLessThanOrEqual(5 * EVNT.ONE);
+    expect(await bet.calcSellFromAmount(result, 0)).toBe(5 * EVNT.ONE);
+    expect(await bet.calcSellFromAmount(result2, 0)).toBe(3 * EVNT.ONE);
 });
 
 test('Buy Outcome Tokens', async () => {
