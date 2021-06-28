@@ -227,6 +227,7 @@ class Bet {
         let maximumRange = marginalPrice * sellAmount
         let minimumRange = 0
         let midRange = 0;
+        let oldMidRange = 0;
 
         while (minimumRange <= maximumRange) {
             midRange = Math.ceil((minimumRange + maximumRange) / 2)
@@ -235,11 +236,18 @@ class Bet {
             if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
                 break;
             }
+            if (oldMidRange === midRange) {
+                if (minimumRange === maximumRange) {
+                    break;
+                }
+                minimumRange = maximumRange;
+            }
             if (approxSell < sellAmount) {
                 minimumRange = midRange
             } else {
                 maximumRange = midRange
             }
+            oldMidRange = midRange;
         }
 
         return midRange;
@@ -262,6 +270,7 @@ class Bet {
         let maximumRange = marginalPrice * sellAmount
         let minimumRange = 0
         let midRange = 0;
+        let oldMidRange = 0;
 
         while (minimumRange <= maximumRange) {
             midRange = Math.ceil((minimumRange + maximumRange) / 2)
@@ -270,11 +279,18 @@ class Bet {
             if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
                 break;
             }
+            if (oldMidRange === midRange) {
+                if (minimumRange === maximumRange) {
+                    break;
+                }
+                minimumRange = maximumRange;
+            }
             if (approxSell < sellAmount) {
                 minimumRange = midRange
             } else {
                 maximumRange = midRange
             }
+            oldMidRange = midRange;
         }
 
         return midRange;
