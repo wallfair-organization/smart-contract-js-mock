@@ -34,6 +34,7 @@ async function teardownDatabase() {
     await pool.query('DROP TABLE token_transactions;');
     await pool.query('DROP TABLE token_balances;');
     await pool.query('DROP TABLE bet_reports;');
+    await pool.query('DROP TABLE amm_interactions;');
 }
 
 /**

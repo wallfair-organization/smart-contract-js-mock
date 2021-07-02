@@ -188,6 +188,35 @@ class Bet {
      * @param outcome {number}
      * @returns {Promise<number>}
      */
+    calcSellOfBalance = async (poolBalances, returnAmount, outcome) => {
+        const outcomeKey = this.getOutcomeKey(outcome);
+
+        if (outcome < 0 || outcome > this.outcomes) {
+            throw new NoWeb3Exception("The outcome needs to be int the range between 0 and " + this.outcomes + ", but is \"" + outcome + "\"");
+        }
+
+        const returnAmountPlusFees = returnAmount + (returnAmount * this.fee);
+        const sellTokenPoolBalance = poolBalances[outcomeKey];
+        let endingOutcomeBalance = sellTokenPoolBalance;
+
+        for (let i = 0; i < Object.keys(poolBalances).length; i++) {
+            const poolBalanceKey = Object.keys(poolBalances)[i];
+            if (poolBalanceKey !== outcomeKey) {
+                const poolBalance = poolBalances[poolBalanceKey];
+                endingOutcomeBalance = Math.ceil((endingOutcomeBalance * poolBalance) / (poolBalance - returnAmountPlusFees));
+            }
+        }
+
+        return returnAmountPlusFees + endingOutcomeBalance - sellTokenPoolBalance;
+    }
+
+    /**
+     * Calculate the amount of outcome-tokens required to sell for the requested return amount
+     *
+     * @param returnAmount {number}
+     * @param outcome {number}
+     * @returns {Promise<number>}
+     */
     calcSell = async (returnAmount, outcome) => {
         const poolBalances = await this.getPoolBalances();
         const outcomeKey = this.getOutcomeKey(outcome);
@@ -219,9 +248,10 @@ class Bet {
      * @returns {Promise<number>}
      */
     calcSellFromAmount = async (sellAmount, outcome) => {
+        const poolBalances = await this.getPoolBalances();
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
-        const marginalR = Math.ceil(await this.calcSell(this.collateralToken.ONE, outcome));
+        const marginalR = Math.ceil(await this.calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome));
         const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
 
         let maximumRange = marginalPrice * sellAmount
@@ -232,7 +262,7 @@ class Bet {
         while (minimumRange <= maximumRange) {
             midRange = Math.ceil((minimumRange + maximumRange) / 2)
 
-            const approxSell = Math.ceil(await this.calcSell(midRange, outcome));
+            const approxSell = Math.ceil(await this.calcSellOfBalance(poolBalances, midRange, outcome));
             if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
                 break;
             }
@@ -262,9 +292,10 @@ class Bet {
      * @returns {Promise<number>}
      */
     calcSellFromAmountChain = async (dbClient, sellAmount, outcome) => {
+        const poolBalances = await this.getPoolBalancesChain(dbClient);
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
-        const marginalR = Math.ceil(await this.calcSellChain(dbClient, this.collateralToken.ONE, outcome));
+        const marginalR = Math.ceil(await this.calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome));
         const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
 
         let maximumRange = marginalPrice * sellAmount
@@ -275,7 +306,7 @@ class Bet {
         while (minimumRange <= maximumRange) {
             midRange = Math.ceil((minimumRange + maximumRange) / 2)
 
-            const approxSell = Math.ceil(await this.calcSellChain(dbClient, midRange, outcome));
+            const approxSell = Math.ceil(await this.calcSellOfBalance(poolBalances, midRange, outcome));
             if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
                 break;
             }
@@ -401,7 +432,7 @@ class Bet {
 
         try {
             const returnAmount = await this.calcSellFromAmountChain(dbClient, sellAmount, outcome);
-            const feeAmount = Math.ceil(sellAmount * this.fee);
+            const feeAmount = Math.ceil(returnAmount * this.fee);
             const outcomeToken = this.getOutcomeTokens()[outcome];
 
             if (returnAmount < minReturnAmount) {
