@@ -110,6 +110,35 @@ test('Buy and Sell Outcome Tokens', async () => {
     expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBe(expectedOutcomeTokens - expectedOutcomeTokensToSell);
 });
 
+test('Buy and Sell Returns', async () => {
+    const buyOutcomeTokensBetId = 'buyAndSellReturns';
+    const investorWalletId = 'buyAndSellReturnsInvestor';
+
+    await EVNT.mint(investorWalletId, investAmount);
+
+    const bet = new Bet(buyOutcomeTokensBetId);
+    await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+    const expectedOutcomeTokens = await bet.calcBuy(investAmount, 0);
+    const resultBuy = await bet.buy(investorWalletId, investAmount, 0, 1);
+    const newBalanceAfterBuy = await bet.getOutcomeToken(0).balanceOf(investorWalletId)
+
+    expect(newBalanceAfterBuy).toBeGreaterThan(expectedOutcomeTokens - 10);
+    expect(resultBuy[bet.getOutcomeToken(0).symbol]).toBe(newBalanceAfterBuy);
+    expect(resultBuy['boughtOutcomeTokens']).toBe(expectedOutcomeTokens);
+    expect(resultBuy['spendTokens']).toBe(investAmount);
+
+    const expectedOutcomeTokensToSell = await bet.calcSell(5 * EVNT.ONE, 0);
+    const resultSell = await bet.sell(investorWalletId, 5 * EVNT.ONE, 0, expectedOutcomeTokensToSell + 1);
+    const newBalanceAfterSell = await bet.getOutcomeToken(0).balanceOf(investorWalletId);
+
+    expect(await EVNT.balanceOf(investorWalletId)).toBeLessThan(expectedOutcomeTokensToSell);
+    expect(newBalanceAfterSell).toBe(expectedOutcomeTokens - expectedOutcomeTokensToSell);
+    expect(resultSell[bet.getOutcomeToken(0).symbol]).toBe(newBalanceAfterSell);
+    expect(resultSell['soldOutcomeTokens']).toBe(expectedOutcomeTokensToSell);
+    expect(resultSell['earnedTokens']).toBe(5 * EVNT.ONE);
+});
+
 test('Buy and Sell from Amount', async () => {
     const buyOutcomeTokensBetId = 'buyAndSellFromAmount';
     const investorWalletId = 'buyAndSellFromAmountTokensInvestor';
