@@ -73,6 +73,18 @@ class Bet {
         return balances;
     }
 
+    isWalletInvested = async (userId) => {
+        const balances = await this.getWalletBalances(userId);
+        return this.isWalletInvestedOfBalance(balances);
+    }
+
+    isWalletInvestedOfBalance = (balances) => {
+        for (const balance of Object.values(balances)) {
+            if (balance > 0) return true;
+        }
+        return false;
+    }
+
     addLiquidity = async (provider, amount) => {
         const dbClient = await createDBTransaction();
         try {
@@ -359,6 +371,7 @@ class Bet {
             await insertAMMInteraction(dbClient, buyer, this.betId, outcome, "BUY", investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
 
             const newBalances = await this.getWalletBalancesChain(dbClient, buyer);
+            newBalances['isInvested'] = this.isWalletInvestedOfBalance(newBalances);
             newBalances['boughtOutcomeTokens'] = outcomeTokensToBuy;
             newBalances['spendTokens'] = investmentAmount;
 
@@ -403,6 +416,7 @@ class Bet {
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, outcomeTokensToSell, new Date());
 
             const newBalances = await this.getWalletBalancesChain(dbClient, seller);
+            newBalances['isInvested'] = this.isWalletInvestedOfBalance(newBalances);
             newBalances['soldOutcomeTokens'] = outcomeTokensToSell;
             newBalances['earnedTokens'] = returnAmount;
 
@@ -446,6 +460,7 @@ class Bet {
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, sellAmount, new Date());
 
             const newBalances = await this.getWalletBalancesChain(dbClient, seller);
+            newBalances['isInvested'] = this.isWalletInvestedOfBalance(newBalances);
             newBalances['soldOutcomeTokens'] = sellAmount;
             newBalances['earnedTokens'] = returnAmount;
 
