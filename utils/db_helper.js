@@ -23,8 +23,8 @@ async function getConnection() {
 async function setupDatabase() {
     await pool.query('CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount int8 not null, symbol varchar(255) not null, trx_timestamp timestamp not null)');
     await pool.query('CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance int8 not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol))');
-    await pool.query('CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome varchar(3) not null, report_timestamp timestamp not null)');
-    await pool.query('CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome varchar(3) NOT NULL, direction varchar(10) NOT NULL, investmentAmount int8 NOT NULL, feeAmount int8 NOT NULL, outcomeTokensBought int8 NOT NULL, trx_timestamp timestamp NOT NULL)');
+    await pool.query('CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome int not null, report_timestamp timestamp not null)');
+    await pool.query('CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome int NOT NULL, direction varchar(10) NOT NULL, investmentAmount int8 NOT NULL, feeAmount int8 NOT NULL, outcomeTokensBought int8 NOT NULL, trx_timestamp timestamp NOT NULL)');
 }
 
 /**
@@ -170,7 +170,7 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @param client {Client}
  * @param buyer {String}
  * @param bet {String}
- * @param outcome {String}
+ * @param outcome {number}
  * @param direction {String}
  * @param investmentAmount {number}
  * @param feeAmount {number}
@@ -248,7 +248,7 @@ async function viewUserInvestment(user, bet, outcome) {
  *
  * @param bet_id {String}
  * @param reporter {String}
- * @param outcome {"yes" | "no"}
+ * @param outcome {number}
  * @param timestamp {Date}
  * @returns {Promise<void>}
  */
