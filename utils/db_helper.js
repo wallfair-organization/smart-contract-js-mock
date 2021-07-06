@@ -10,6 +10,40 @@ const pool = new Pool({
     ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {rejectUnauthorized: false})
 });
 
+const BEGIN = 'BEGIN';
+const COMMIT = 'COMMIT';
+const ROLLBACK = 'ROLLBACK';
+const SET_ISOLATION_LEVEL = 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ';
+
+// ToDo: amount as BigInt
+const CREATE_TOKEN_TRANSACTIONS = 'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
+// ToDo: balance as BigInt
+const CREATE_TOKEN_BALANCES = 'CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance bigint not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol));';
+const CREATE_BET_REPORTS = 'CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome smallint not null, report_timestamp timestamp not null);';
+// ToDo: investmentAmount, feeAmount, outcomeTokensBought as BigInt
+const CREATE_AMM_INTERACTIONS = 'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
+
+const TEARDOWN_TOKEN_TRANSACTIONS = 'DROP TABLE token_transactions;';
+const TEARDOWN_TOKEN_BALANCES = 'DROP TABLE token_balances;';
+const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
+const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
+
+const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
+const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
+const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1;';
+const GET_LIMIT_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY balance DESC LIMIT $2;';
+
+const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
+const GET_USER_INVESTMENT = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction;';
+const GET_TRANSACTIONS_OF_USER = 'SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1);';
+const GET_TRANSACTIONS_OF_USER_AND_TOKEN = 'SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2);';
+
+const UPDATE_BALANCE_OF_USER = 'INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = $4;'
+const INSERT_TOKEN_TRANSACTION = 'INSERT INTO token_transactions(sender, receiver, amount, symbol, trx_timestamp) VALUES($1, $2, $3, $4, $5);';
+const INSERT_AMM_INTERACTION = 'INSERT INTO amm_interactions(buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp) VALUES($1, $2, $3, $4, $5, $6, $7, $8);';
+const INSERT_REPORT = 'INSERT INTO bet_reports(bet_id, reporter, outcome, report_timestamp) VALUES($1, $2, $3, $4);';
+const GET_REPORT = 'SELECT * FROM bet_reports WHERE bet_id = $1;';
+
 /**
  * @returns {Promise<Client>}
  */
@@ -21,20 +55,20 @@ async function getConnection() {
  * @returns {Promise<void>}
  */
 async function setupDatabase() {
-    await pool.query('CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount int8 not null, symbol varchar(255) not null, trx_timestamp timestamp not null)');
-    await pool.query('CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance int8 not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol))');
-    await pool.query('CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome int not null, report_timestamp timestamp not null)');
-    await pool.query('CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome int NOT NULL, direction varchar(10) NOT NULL, investmentAmount int8 NOT NULL, feeAmount int8 NOT NULL, outcomeTokensBought int8 NOT NULL, trx_timestamp timestamp NOT NULL)');
+    await pool.query(CREATE_TOKEN_TRANSACTIONS);
+    await pool.query(CREATE_TOKEN_BALANCES);
+    await pool.query(CREATE_BET_REPORTS);
+    await pool.query(CREATE_AMM_INTERACTIONS);
 }
 
 /**
  * @returns {Promise<void>}
  */
 async function teardownDatabase() {
-    await pool.query('DROP TABLE token_transactions;');
-    await pool.query('DROP TABLE token_balances;');
-    await pool.query('DROP TABLE bet_reports;');
-    await pool.query('DROP TABLE amm_interactions;');
+    await pool.query(TEARDOWN_TOKEN_TRANSACTIONS);
+    await pool.query(TEARDOWN_TOKEN_BALANCES);
+    await pool.query(TEARDOWN_BET_REPORTS);
+    await pool.query(TEARDOWN_AMM_INTERACTIONS);
 }
 
 /**
@@ -42,8 +76,8 @@ async function teardownDatabase() {
  */
 async function createDBTransaction() {
     const client = await getConnection();
-    await client.query('BEGIN');
-    await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+    await client.query(BEGIN);
+    await client.query(SET_ISOLATION_LEVEL);
     return client;
 }
 
@@ -52,7 +86,7 @@ async function createDBTransaction() {
  * @returns {Promise<void>}
  */
 async function commitDBTransaction(client) {
-    await client.query('COMMIT');
+    await client.query(COMMIT);
     client.release();
 }
 
@@ -61,12 +95,13 @@ async function commitDBTransaction(client) {
  * @returns {Promise<void>}
  */
 async function rollbackDBTransaction(client) {
-    await client.query('ROLLBACK');
+    await client.query(ROLLBACK);
     client.release();
 }
 
 /**
  * Get the balance of a specific token from a user
+ * Build for Transactions
  *
  * @param client {Client}
  * @param user {String}
@@ -74,7 +109,7 @@ async function rollbackDBTransaction(client) {
  * @returns {Promise<*>}
  */
 async function getBalanceOfUser(client, user, symbol) {
-    const res = await client.query('SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2', [symbol, user]);
+    const res = await client.query(GET_BALANCE_OF_USER, [symbol, user]);
     return res.rows;
 }
 
@@ -86,7 +121,7 @@ async function getBalanceOfUser(client, user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewBalanceOfUser(user, symbol) {
-    const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2', [symbol, user]);
+    const res = await pool.query(GET_BALANCE_OF_USER, [symbol, user]);
     return res.rows;
 }
 
@@ -97,19 +132,20 @@ async function viewBalanceOfUser(user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewAMMInteractionsOfUser(user) {
-    const res = await pool.query('SELECT * FROM amm_interactions WHERE buyer = $1', [user]);
+    const res = await pool.query(GET_ALL_AMM_INTERACTIONS_OF_USER, [user]);
     return res.rows;
 }
 
 /**
  * Get the balance of a specific token from a user
+ * Build for Transactions
  *
  * @param client {Client}
  * @param user {String}
  * @returns {Promise<*>}
  */
 async function getAllBalancesOfUser(client, user) {
-    const res = await client.query('SELECT * FROM token_balances WHERE owner = $1', [user]);
+    const res = await client.query(GET_ALL_BALANCE_OF_USER, [user]);
     return res.rows;
 }
 
@@ -120,19 +156,20 @@ async function getAllBalancesOfUser(client, user) {
  * @returns {Promise<*>}
  */
 async function viewAllBalancesOfUser(user) {
-    const res = await pool.query('SELECT * FROM token_balances WHERE owner = $1', [user]);
+    const res = await pool.query(GET_ALL_BALANCE_OF_USER, [user]);
     return res.rows;
 }
 
 /**
  * Get the balance of a specific token
+ * Build for Transactions
  *
  * @param client {Client}
  * @param symbol {String}
  * @returns {Promise<*>}
  */
 async function getAllBalancesOfToken(client, symbol) {
-    const res = await client.query('SELECT * FROM token_balances WHERE symbol = $1', [symbol]);
+    const res = await client.query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
     return res.rows;
 }
 
@@ -143,7 +180,7 @@ async function getAllBalancesOfToken(client, symbol) {
  * @returns {Promise<*>}
  */
 async function viewAllBalancesOfToken(symbol) {
-    const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1', [symbol]);
+    const res = await pool.query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
     return res.rows;
 }
 
@@ -155,29 +192,44 @@ async function viewAllBalancesOfToken(symbol) {
  * @returns {Promise<*>}
  */
 async function viewLimitBalancesOfToken(symbol, limit) {
-    const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1 ORDER BY balance DESC LIMIT $2', [symbol, limit]);
+    const res = await pool.query(GET_LIMIT_BALANCE_OF_TOKEN, [symbol, limit]);
     return res.rows;
 }
 
 /**
  * Update the balance of a specific token from a user
+ * Build for Transactions
  *
  * @param client {Client}
  * @param user {String}
  * @param symbol {String}
  * @param timestamp {Date}
- * @param newBalance {number}
+ * @param newBalance {bigint}
  * @returns {Promise<void>}
  */
 async function updateBalanceOfUser(client, user, symbol, timestamp, newBalance) {
-    await client.query('INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = $4;', [user, symbol, timestamp, newBalance]);
-}
-
-async function insertTransaction(client, sender, receiver, amount, symbol, timestamp) {
-    await client.query('INSERT INTO token_transactions(sender, receiver, amount, symbol, trx_timestamp) VALUES($1, $2, $3, $4, $5)', [sender, receiver, amount, symbol, timestamp]);
+    await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, newBalance]);
 }
 
 /**
+ * Save a Token Transaction
+ * Build for Transactions
+ *
+ * @param client {Client}
+ * @param sender {String}
+ * @param receiver {String}
+ * @param amount {bigint}
+ * @param symbol {String}
+ * @param timestamp
+ * @returns {Promise<void>}
+ */
+async function insertTransaction(client, sender, receiver, amount, symbol, timestamp) {
+    await client.query(INSERT_TOKEN_TRANSACTION, [sender, receiver, amount, symbol, timestamp]);
+}
+
+/**
+ * Save a Interaction with the AMM
+ * Build for Transactions
  *
  * @param client {Client}
  * @param buyer {String}
@@ -191,11 +243,36 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @returns {Promise<void>}
  */
 async function insertAMMInteraction(client, buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp) {
-    await client.query('INSERT INTO amm_interactions(buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp) VALUES($1, $2, $3, $4, $5, $6, $7, $8)', [buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp]);
+    await client.query(INSERT_AMM_INTERACTION, [buyer, bet, outcome, direction, investmentAmount, feeAmount, outcomeTokensBought, trx_timestamp]);
 }
 
 /**
  * Get all transactions of a user with a specific token
+ * Build for Transactions
+ *
+ * @param client {Client}
+ * @param user {String}
+ * @returns {Promise<*>}
+ */
+async function getTransactionOfUser(client, user) {
+    const res = await client.query(GET_TRANSACTIONS_OF_USER, [user]);
+    return res.rows;
+}
+
+/**
+ * Get all transactions of a user with a specific token
+ *
+ * @param user {String}
+ * @returns {Promise<*>}
+ */
+async function viewTransactionOfUser(user) {
+    const res = await pool.query(GET_TRANSACTIONS_OF_USER, [user]);
+    return res.rows;
+}
+
+/**
+ * Get all transactions of a user with a specific token
+ * Build for Transactions
  *
  * @param client {Client}
  * @param user {String}
@@ -203,19 +280,7 @@ async function insertAMMInteraction(client, buyer, bet, outcome, direction, inve
  * @returns {Promise<*>}
  */
 async function getTransactionOfUserBySymbol(client, user, symbol) {
-    const res = await client.query('SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2)', [symbol, user]);
-    return res.rows;
-}
-
-/**
- * Get all transactions of a user with a specific token
- *
- * @param client {Client}
- * @param user {String}
- * @returns {Promise<*>}
- */
-async function getTransactionOfUser(client, user) {
-    const res = await client.query('SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1)', [user]);
+    const res = await client.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
     return res.rows;
 }
 
@@ -227,18 +292,7 @@ async function getTransactionOfUser(client, user) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbol(user, symbol) {
-    const res = await pool.query('SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2)', [symbol, user]);
-    return res.rows;
-}
-
-/**
- * Get all transactions of a user with a specific token
- *
- * @param user {String}
- * @returns {Promise<*>}
- */
-async function viewTransactionOfUser(user) {
-    const res = await pool.query('SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1)', [user]);
+    const res = await pool.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
     return res.rows;
 }
 
@@ -251,7 +305,7 @@ async function viewTransactionOfUser(user) {
  * @returns {Promise<*>}
  */
 async function viewUserInvestment(user, bet, outcome) {
-    const res = await pool.query('SELECT buyer, bet, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction', [user, bet, outcome]);
+    const res = await pool.query(GET_USER_INVESTMENT, [user, bet, outcome]);
     return res.rows;
 }
 
@@ -265,7 +319,7 @@ async function viewUserInvestment(user, bet, outcome) {
  * @returns {Promise<void>}
  */
 async function insertReport(bet_id, reporter, outcome, timestamp) {
-    await pool.query('INSERT INTO bet_reports(bet_id, reporter, outcome, report_timestamp) VALUES($1, $2, $3, $4)', [bet_id, reporter, outcome, timestamp]);
+    await pool.query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
 }
 
 /**
@@ -275,7 +329,7 @@ async function insertReport(bet_id, reporter, outcome, timestamp) {
  * @returns {Promise<*>}
  */
 async function viewReport(bet_id) {
-    const res = await pool.query('SELECT * FROM bet_reports WHERE bet_id = $1', [bet_id]);
+    const res = await pool.query(GET_REPORT, [bet_id]);
     return res.rows;
 }
 
