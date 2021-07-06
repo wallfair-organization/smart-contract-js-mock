@@ -68,11 +68,7 @@ test('Check AMM Test', async () => {
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const result = await bet.calcSell(5n * EVNT.ONE, 0);
-
-    console.log(result);
-
     const result2 = await bet.calcSell(3n * EVNT.ONE, 0);
-    console.log(result2);
 
     expect(await bet.calcSellFromAmount(result, 0)).toBe(5n * EVNT.ONE);
     expect(await bet.calcSellFromAmount(result2, 0)).toBe(3n * EVNT.ONE);
@@ -138,7 +134,7 @@ test('Buy and Sell Returns', async () => {
     const newBalanceAfterSell = await bet.getOutcomeToken(0).balanceOf(investorWalletId);
 
     expect(await EVNT.balanceOf(investorWalletId)).toBe(expectedReturnAmount);
-    expect(newBalanceAfterSell).toBe(0);
+    expect(newBalanceAfterSell).toBe(0n);
     expect(resultSell[bet.getOutcomeToken(0).symbol]).toBe(newBalanceAfterSell);
     expect(resultSell['soldOutcomeTokens']).toBe(expectedOutcomeTokens);
     expect(resultSell['earnedTokens']).toBe(expectedReturnAmount);
@@ -168,6 +164,6 @@ test('Buy and Sell from Amount', async () => {
     await bet.sellAmount(investorWalletId, expectedOutcomeTokens, 0, 0n);
 
     expect(await EVNT.balanceOf(investorWalletId)).toBe(expectedReturnAmount);
-    expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBe(0);
+    expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBe(0n);
     expect(await bet.getOutcomeToken(1).balanceOf(investorWalletId)).toBe(expectedOutcomeTokensNo);
 });
