@@ -10,7 +10,7 @@ afterAll(async () => {
 });
 
 test('Mint Tokens', async () => {
-    const tokensToMint = 1000;
+    const tokensToMint = 1000n;
     const testMintWallet = 'testMint';
 
     const EVNT = new ERC20('EVNT');
@@ -21,8 +21,8 @@ test('Mint Tokens', async () => {
 });
 
 test('Transfer Tokens', async () => {
-    const tokensToMint = 1000;
-    const tokensToTransfer = 100;
+    const tokensToMint = 1000n;
+    const tokensToTransfer = 100n;
     const testSenderWallet = 'testSender';
     const testReceiverWallet = 'testReceiver';
 
@@ -36,8 +36,8 @@ test('Transfer Tokens', async () => {
 });
 
 test('Burn Tokens', async () => {
-    const tokensToMint = 1000;
-    const tokensToBurn = 100;
+    const tokensToMint = 1000n;
+    const tokensToBurn = 100n;
     const testBurnWallet = 'testBurn';
 
     const EVNT = new ERC20('EVNT');
