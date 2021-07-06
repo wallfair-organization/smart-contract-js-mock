@@ -5,6 +5,7 @@ const {
     rollbackDBTransaction,
     commitDBTransaction,
     insertAMMInteraction,
+    viewAllBalancesOfToken,
     insertReport, viewReport
 } = require('../utils/db_helper');
 
@@ -53,6 +54,10 @@ class Bet {
             balances[token.symbol] = await token.balanceOfChain(dbClient, this.walletId);
         }
         return balances;
+    }
+
+    getInvestorsOfOutcome = async (outcome) => {
+        return await viewAllBalancesOfToken(this.getOutcomeKey(outcome));
     }
 
     getWalletBalances = async (userId) => {
@@ -435,6 +440,12 @@ class Bet {
         await insertReport(this.betId, reporter, outcome, new Date());
     }
 
+    /**
+     * Complete a Payout for a User
+     *
+     * @param beneficiary {String}
+     * @returns {Promise<number>}
+     */
     getPayout = async (beneficiary) => {
         if (!(await this.isResolved())) {
             throw new NoWeb3Exception("The Bet is not resolved yet!");
@@ -451,6 +462,7 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
 
             await commitDBTransaction(dbClient);
+            return outcomeBalance;
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
