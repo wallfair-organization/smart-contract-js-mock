@@ -136,8 +136,6 @@ class ERC20 {
                     await updateBalanceOfUser(dbClient, sender, this.symbol, trx_time, senderBalance - amount);
                     await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
                     await insertTransaction(dbClient, sender, receiver, amount, this.symbol, trx_time);
-
-                    await commitDBTransaction(dbClient);
                 } catch (e) {
                     await rollbackDBTransaction(dbClient);
                     throw new NoWeb3Exception(e.message);

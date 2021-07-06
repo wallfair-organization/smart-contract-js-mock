@@ -15,12 +15,9 @@ const COMMIT = 'COMMIT';
 const ROLLBACK = 'ROLLBACK';
 const SET_ISOLATION_LEVEL = 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ';
 
-// ToDo: amount as BigInt
 const CREATE_TOKEN_TRANSACTIONS = 'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
-// ToDo: balance as BigInt
 const CREATE_TOKEN_BALANCES = 'CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance bigint not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol));';
 const CREATE_BET_REPORTS = 'CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome smallint not null, report_timestamp timestamp not null);';
-// ToDo: investmentAmount, feeAmount, outcomeTokensBought as BigInt
 const CREATE_AMM_INTERACTIONS = 'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
 
 const TEARDOWN_TOKEN_TRANSACTIONS = 'DROP TABLE token_transactions;';
@@ -236,9 +233,9 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @param bet {String}
  * @param outcome {number}
  * @param direction {String}
- * @param investmentAmount {number}
- * @param feeAmount {number}
- * @param outcomeTokensBought {number}
+ * @param investmentAmount {bigint}
+ * @param feeAmount {bigint}
+ * @param outcomeTokensBought {bigint}
  * @param trx_timestamp
  * @returns {Promise<void>}
  */
