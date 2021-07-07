@@ -34,6 +34,7 @@ async function teardownDatabase() {
     await pool.query('DROP TABLE token_transactions;');
     await pool.query('DROP TABLE token_balances;');
     await pool.query('DROP TABLE bet_reports;');
+    await pool.query('DROP TABLE amm_interactions;');
 }
 
 /**
@@ -139,10 +140,21 @@ async function getAllBalancesOfToken(client, symbol) {
  * View the balance of a specific token
  *
  * @param symbol {String}
+ * @returns {Promise<*>}
+ */
+async function viewAllBalancesOfToken(symbol) {
+    const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1', [symbol]);
+    return res.rows;
+}
+
+/**
+ * View the balance of a specific token
+ *
+ * @param symbol {String}
  * @param limit {number}
  * @returns {Promise<*>}
  */
-async function viewAllBalancesOfToken(symbol, limit) {
+async function viewLimitBalancesOfToken(symbol, limit) {
     const res = await pool.query('SELECT * FROM token_balances WHERE symbol = $1 ORDER BY balance DESC LIMIT $2', [symbol, limit]);
     return res.rows;
 }
@@ -280,6 +292,7 @@ module.exports = {
     viewAllBalancesOfUser,
     getAllBalancesOfToken,
     viewAllBalancesOfToken,
+    viewLimitBalancesOfToken,
     updateBalanceOfUser,
     insertTransaction,
     insertAMMInteraction,
