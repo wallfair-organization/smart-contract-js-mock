@@ -263,9 +263,11 @@ class Bet {
     _calcSellFromAmountOfBalance = (poolBalances, sellAmount, outcome) => {
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
-        // const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome);
-        // const marginalPrice = outcomeToken.ONE / marginalR; // TODO: This is the ISSUE!!! LOL Fix it Dumbass
-        const marginalPrice = 1n;
+        const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome);
+        let marginalPrice = outcomeToken.ONE / marginalR;
+        if (marginalPrice <= 0) {
+            marginalPrice = 1n;
+        }
 
         let maximumRange = marginalPrice * sellAmount;
         let minimumRange = 0n;
