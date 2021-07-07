@@ -307,12 +307,12 @@ class Bet {
 
             await insertAMMInteraction(dbClient, buyer, this.betId, outcome, "BUY", investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
 
-            const newBalances = await this.getWalletBalancesChain(dbClient, buyer);
+            await commitDBTransaction(dbClient);
+
+            const newBalances = await this.getWalletBalances(buyer);
             newBalances['isInvested'] = this.isWalletInvestedOfBalance(newBalances);
             newBalances['boughtOutcomeTokens'] = outcomeTokensToBuy;
             newBalances['spendTokens'] = investmentAmount;
-
-            await commitDBTransaction(dbClient);
 
             return newBalances;
         } catch (e) {
@@ -352,12 +352,12 @@ class Bet {
 
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, outcomeTokensToSell, new Date());
 
-            const newBalances = await this.getWalletBalancesChain(dbClient, seller);
+            await commitDBTransaction(dbClient);
+
+            const newBalances = await this.getWalletBalances(seller);
             newBalances['isInvested'] = this.isWalletInvestedOfBalance(newBalances);
             newBalances['soldOutcomeTokens'] = outcomeTokensToSell;
             newBalances['earnedTokens'] = returnAmount;
-
-            await commitDBTransaction(dbClient);
 
             return newBalances;
         } catch (e) {
@@ -396,12 +396,12 @@ class Bet {
 
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, sellAmount, new Date());
 
-            const newBalances = await this.getWalletBalancesChain(dbClient, seller);
+            await commitDBTransaction(dbClient);
+
+            const newBalances = await this.getWalletBalances(seller);
             newBalances['isInvested'] = this.isWalletInvestedOfBalance(newBalances);
             newBalances['soldOutcomeTokens'] = sellAmount;
             newBalances['earnedTokens'] = returnAmount;
-
-            await commitDBTransaction(dbClient);
 
             return newBalances;
         } catch (e) {
