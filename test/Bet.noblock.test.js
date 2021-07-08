@@ -22,9 +22,9 @@ beforeEach(async () => {
 });
 
 test('Add Liquidity', async () => {
-   const addLiquidityBetId = 'addLiquidity';
+   const testBetId = 'addLiquidity';
 
-   const bet = new Bet(addLiquidityBetId, 3);
+   const bet = new Bet(testBetId, 3);
    await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
    expect(await EVNT.balanceOf(liquidityProviderWallet)).toBe(0n);
@@ -34,11 +34,11 @@ test('Add Liquidity', async () => {
 });
 
 test('Resolve Bet', async () => {
-    const resolveBetId = 'resolveBet';
+    const testBetId = 'resolveBet';
     const betResolver = 'WallfairBetResolver';
     const resolvedOutcome = 1;
 
-    const bet = new Bet(resolveBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.resolveBet(betResolver, resolvedOutcome);
 
     expect(await bet.isResolved()).toBe(true);
@@ -49,9 +49,9 @@ test('Resolve Bet', async () => {
 });
 
 test('Check AMM', async () => {
-    const checkAmmBetId = 'checkAmm';
+    const testBetId = 'checkAmm';
 
-    const bet = new Bet(checkAmmBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     expect(await bet.calcBuy(10n * EVNT.ONE, 0)).toBeLessThan(liquidityAmount);
@@ -60,10 +60,10 @@ test('Check AMM', async () => {
     expect(await bet.calcSell(10n * EVNT.ONE, 1)).toBeLessThan(liquidityAmount);
 });
 
-test('Check AMM Test', async () => {
-    const checkAmmBetId = 'checkAmm';
+test('Check AMM Sell from Amount', async () => {
+    const testBetId = 'checkAmmSellFromAmount';
 
-    const bet = new Bet(checkAmmBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const result = await bet.calcSell(5n * EVNT.ONE, 0);
@@ -74,12 +74,12 @@ test('Check AMM Test', async () => {
 });
 
 test('Buy Outcome Tokens', async () => {
-    const buyOutcomeTokensBetId = 'buyOutcomeTokens';
+    const testBetId = 'buyOutcomeTokens';
     const investorWalletId = 'buyOutcomeTokensInvestor';
 
     await EVNT.mint(investorWalletId, investAmount);
 
-    const bet = new Bet(buyOutcomeTokensBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const expectedOutcomeTokens = await bet.calcBuy(investAmount, 0);
@@ -89,12 +89,12 @@ test('Buy Outcome Tokens', async () => {
 });
 
 test('Buy and Sell Outcome Tokens', async () => {
-    const buyOutcomeTokensBetId = 'buyAndSellOutcomeTokens';
+    const testBetId = 'buyAndSellOutcomeTokens';
     const investorWalletId = 'buyAndSellOutcomeTokensInvestor';
 
     await EVNT.mint(investorWalletId, investAmount);
 
-    const bet = new Bet(buyOutcomeTokensBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const expectedOutcomeTokens = await bet.calcBuy(investAmount, 0);
@@ -110,12 +110,12 @@ test('Buy and Sell Outcome Tokens', async () => {
 });
 
 test('Buy and Sell Returns', async () => {
-    const buyOutcomeTokensBetId = 'buyAndSellReturns';
+    const testBetId = 'buyAndSellReturns';
     const investorWalletId = 'buyAndSellReturnsInvestor';
 
     await EVNT.mint(investorWalletId, investAmount);
 
-    const bet = new Bet(buyOutcomeTokensBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const expectedOutcomeTokens = await bet.calcBuy(investAmount, 0);
@@ -141,17 +141,17 @@ test('Buy and Sell Returns', async () => {
 });
 
 test('Buy and Sell from Amount', async () => {
-    const buyOutcomeTokensBetId = 'buyAndSellFromAmount';
+    const testBetId = 'buyAndSellFromAmount';
     const investorWalletId = 'buyAndSellFromAmountTokensInvestor';
 
     await EVNT.mint(investorWalletId, investAmount);
     await EVNT.mint(investorWalletId, investAmount);
 
-    const bet = new Bet(buyOutcomeTokensBetId);
+    const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const expectedOutcomeTokens = await bet.calcBuy(investAmount, 0);
-    await bet.buy(investorWalletId, investAmount, 0, 1);
+    await bet.buy(investorWalletId, investAmount, 0, 1n);
 
     const expectedOutcomeTokensNo = await bet.calcBuy(investAmount, 1);
     await bet.buy(investorWalletId, investAmount, 1, 1n);
@@ -165,4 +165,37 @@ test('Buy and Sell from Amount', async () => {
     expect(await EVNT.balanceOf(investorWalletId)).toBe(expectedReturnAmount);
     expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBe(0n);
     expect(await bet.getOutcomeToken(1).balanceOf(investorWalletId)).toBe(expectedOutcomeTokensNo);
+});
+
+test('Test Payout', async () => {
+    const testBetId = 'testPayout';
+    const singlePayoutWallet = 'singlePayoutWallet';
+
+    const bet = new Bet(testBetId, 1);
+
+    await EVNT.mint(bet.walletId, investAmount);
+    await bet.getOutcomeToken(0).mint(singlePayoutWallet, investAmount);
+
+    await bet.resolveBet('testPayout', 0);
+    await bet.getPayout(singlePayoutWallet);
+
+    expect(await EVNT.balanceOf(singlePayoutWallet)).toBe(investAmount);
+});
+
+test('Test batched Payout', async () => {
+    const testBetId = 'testBatchedPayout';
+    const batchedPayoutWallet1 = 'batchedPayoutWallet1';
+    const batchedPayoutWallet2 = 'batchedPayoutWallet2';
+
+    const bet = new Bet(testBetId, 1);
+
+    await EVNT.mint(bet.walletId, 2n * investAmount);
+    await bet.getOutcomeToken(0).mint(batchedPayoutWallet1, investAmount);
+    await bet.getOutcomeToken(0).mint(batchedPayoutWallet2, investAmount);
+
+    await bet.resolveBet('testBatchedPayout', 0);
+    await bet.getBatchedPayout([batchedPayoutWallet1, batchedPayoutWallet2]);
+
+    expect(await EVNT.balanceOf(batchedPayoutWallet1)).toBe(investAmount);
+    expect(await EVNT.balanceOf(batchedPayoutWallet2)).toBe(investAmount);
 });

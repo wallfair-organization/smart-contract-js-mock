@@ -1,0 +1,17 @@
+name: Wallfair. Smart Contract Mock Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - trunk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install modules
+        run: npm install
+      - name: Run tests
+        run: npm test
