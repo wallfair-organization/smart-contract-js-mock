@@ -15,6 +15,12 @@ const FEE_WALLET_PREFIX = 'FEE_';
 
 
 class Bet {
+    /**
+     * Create a Moc Bet instance
+     *
+     * @param betId {string}
+     * @param outcomes {number}
+     */
     constructor(betId, outcomes) {
         this.betId = betId;
         this.fee = 0.01;
@@ -25,8 +31,19 @@ class Bet {
         this.ONE = this.collateralToken.ONE;
     }
 
+    /**
+     * Get the symbol of a Outcome Token
+     *
+     * @param outcome {number}
+     * @returns {string}
+     */
     getOutcomeKey = (outcome) => outcome.toString() + '_' + this.betId;
 
+    /**
+     * Get a List with all Outcome Tokens as ERC20
+     *
+     * @returns {*[]}
+     */
     getOutcomeTokens = () => {
         const tokens = [];
         for (let i = 0; i < this.outcomes; i++) {
@@ -35,30 +52,44 @@ class Bet {
         return tokens;
     }
 
+    /**
+     * Get the ERC20 of the Outcome index
+     *
+     * @param index {number}
+     * @returns {ERC20}
+     */
     getOutcomeToken = (index) => this.getOutcomeTokens()[index];
 
-    getPoolBalances = async () => {
-        const balances = {};
-        const tokens = this.getOutcomeTokens();
-        for (const token of tokens) {
-            balances[token.symbol] = await token.balanceOf(this.walletId);
-        }
-        return balances;
-    }
+    /**
+     * Get the OutcomeToken-Balances of the Market Maker
+     *
+     * @returns {Promise<{}>}
+     */
+    getPoolBalances = async () => await this.getWalletBalances(this.walletId);
 
-    getPoolBalancesChain = async (dbClient) => {
-        const balances = {};
-        const tokens = this.getOutcomeTokens();
-        for (const token of tokens) {
-            balances[token.symbol] = await token.balanceOfChain(dbClient, this.walletId);
-        }
-        return balances;
-    }
+    /**
+     * Get the OutcomeToken-Balances of the Market Maker
+     * Build for Transactions
+     *
+     * @param dbClient {Client}
+     * @returns {Promise<{}>}
+     */
+    getPoolBalancesChain = async (dbClient) => await this.getWalletBalancesChain(dbClient, this.walletId);
 
-    getInvestorsOfOutcome = async (outcome) => {
-        return await viewAllBalancesOfToken(this.getOutcomeKey(outcome));
-    }
+    /**
+     * Get all Investors of a Outcome
+     *
+     * @param outcome {number}
+     * @returns {Promise<*>}
+     */
+    getInvestorsOfOutcome = async (outcome) => await viewAllBalancesOfToken(this.getOutcomeKey(outcome));
 
+    /**
+     * Get the OutcomeToken-Balances of a user
+     *
+     * @param userId {string}
+     * @returns {Promise<{}>}
+     */
     getWalletBalances = async (userId) => {
         const balances = {};
         const tokens = this.getOutcomeTokens();
@@ -68,6 +99,14 @@ class Bet {
         return balances;
     }
 
+    /**
+     * Get the OutcomeToken-Balances of a user
+     * Build for Transactions
+     *
+     * @param dbClient {Client}
+     * @param userId {string}
+     * @returns {Promise<{}>}
+     */
     getWalletBalancesChain = async (dbClient, userId) => {
         const balances = {};
         const tokens = this.getOutcomeTokens();
@@ -77,11 +116,23 @@ class Bet {
         return balances;
     }
 
+    /**
+     * Check if a User has invested in this bet
+     *
+     * @param userId {string}
+     * @returns {Promise<boolean>}
+     */
     isWalletInvested = async (userId) => {
         const balances = await this.getWalletBalances(userId);
         return this.isWalletInvestedOfBalance(balances);
     }
 
+    /**
+     * Check if any of the balances is larger than 0
+     *
+     * @param balances {{}}
+     * @returns {boolean}
+     */
     isWalletInvestedOfBalance = (balances) => {
         for (const balance of Object.values(balances)) {
             if (balance > 0n) return true;
@@ -89,6 +140,13 @@ class Bet {
         return false;
     }
 
+    /**
+     * Add more Liquidity to this bet
+     *
+     * @param provider {string}
+     * @param amount {bigint}
+     * @returns {Promise<void>}
+     */
     addLiquidity = async (provider, amount) => {
         const dbClient = await createDBTransaction();
         try {
@@ -296,7 +354,7 @@ class Bet {
 
     /**
      *
-     * @param buyer {String}
+     * @param buyer {string}
      * @param investmentAmount {bigint}
      * @param outcome {number}
      * @param minOutcomeTokensToBuy {bigint}
@@ -340,7 +398,7 @@ class Bet {
 
     /**
      *
-     * @param seller {String}
+     * @param seller {string}
      * @param returnAmount {bigint}
      * @param outcome {number}
      * @param maxOutcomeTokensToSell {bigint}
@@ -385,7 +443,7 @@ class Bet {
 
     /**
      *
-     * @param seller {String}
+     * @param seller {string}
      * @param sellAmount {bigint}
      * @param outcome {number}
      * @param minReturnAmount {bigint}
@@ -443,7 +501,7 @@ class Bet {
     }
 
     /**
-     * @param reporter {String}
+     * @param reporter {string}
      * @param outcome { number }
      * @returns {Promise<void>}
      */
@@ -460,7 +518,7 @@ class Bet {
     /**
      * Complete a Payout for a User
      *
-     * @param beneficiary {String}
+     * @param beneficiary {string}
      * @returns {Promise<number>}
      */
     getPayout = async (beneficiary) => {

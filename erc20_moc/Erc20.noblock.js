@@ -13,7 +13,7 @@ class ERC20 {
     /**
      * Create a Moc ERC20 instance
      *
-     * @param symbol {String}
+     * @param symbol {string}
      */
     constructor(symbol) {
         this.symbol = symbol;
@@ -23,7 +23,7 @@ class ERC20 {
     /**
      * Calculate the token-balance from the balances
      *
-     * @param user {String}
+     * @param user {string}
      * @param balances {array}
      * @returns {bigint}
      * @private
@@ -43,7 +43,7 @@ class ERC20 {
      * Build for Transactions
      *
      * @param dbClient {Client}
-     * @param user {String}
+     * @param user {string}
      * @returns {Promise<bigint>}
      */
     balanceOfChain = async (dbClient, user) => {
@@ -54,7 +54,7 @@ class ERC20 {
     /**
      * Check the token-balance of an address
      *
-     * @param user {String}
+     * @param user {string}
      * @returns {Promise<bigint>}
      */
     balanceOf = async (user) => {
@@ -67,8 +67,8 @@ class ERC20 {
      * Build for Transactions
      *
      * @param dbClient {Client}
-     * @param sender {String}
-     * @param receiver {String}
+     * @param sender {string}
+     * @param receiver {string}
      * @param amount {bigint}
      * @returns {Promise<void>}
      */
@@ -93,8 +93,8 @@ class ERC20 {
     /**
      * Transfer tokens from one address to another
      *
-     * @param sender {String}
-     * @param receiver {String}
+     * @param sender {string}
+     * @param receiver {string}
      * @param amount {bigint}
      * @returns {Promise<void>}
      */
@@ -118,7 +118,7 @@ class ERC20 {
      * Build for Transactions
      *
      * @param dbClient {Client}
-     * @param receiver {String}
+     * @param receiver {string}
      * @param amount {bigint}
      * @returns {Promise<void>}
      */
@@ -136,7 +136,7 @@ class ERC20 {
     /**
      * Mint new tokens and add them to an address
      *
-     * @param receiver {String}
+     * @param receiver {string}
      * @param amount {bigint}
      * @returns {Promise<void>}
      */
@@ -161,7 +161,7 @@ class ERC20 {
      * Build for Transactions
      *
      * @param dbClient {Client}
-     * @param sponsor {String}
+     * @param sponsor {string}
      * @param amount {bigint}
      * @returns {Promise<void>}
      */
@@ -184,7 +184,7 @@ class ERC20 {
     /**
      * Burn tokens of a sponsor-address
      *
-     * @param sponsor {String}
+     * @param sponsor {string}
      * @param amount {bigint}
      * @returns {Promise<void>}
      */
