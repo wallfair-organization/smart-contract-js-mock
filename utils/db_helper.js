@@ -20,6 +20,9 @@ const CREATE_TOKEN_BALANCES = 'CREATE TABLE IF NOT EXISTS token_balances (owner 
 const CREATE_BET_REPORTS = 'CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome smallint not null, report_timestamp timestamp not null);';
 const CREATE_AMM_INTERACTIONS = 'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
 
+// ALTER TABLE token_transactions ALTER COLUMN amount TYPE BIGINT;
+// ALTER TABLE token_balances ALTER COLUMN balance TYPE BIGINT;
+
 const TEARDOWN_TOKEN_TRANSACTIONS = 'DROP TABLE token_transactions;';
 const TEARDOWN_TOKEN_BALANCES = 'DROP TABLE token_balances;';
 const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';

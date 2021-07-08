@@ -516,10 +516,25 @@ class Bet {
     }
 
     /**
+     *
+     * @param dbClient {Client}
+     * @param outcomeToken {ERC20}
+     * @param beneficiary {string}
+     * @returns {Promise<bigint>}
+     * @private
+     */
+    _payoutChain = async (dbClient, outcomeToken, beneficiary) => {
+        const outcomeBalance = await outcomeToken.balanceOfChain(dbClient, beneficiary);
+        await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
+        await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
+        return outcomeBalance;
+    }
+
+    /**
      * Complete a Payout for a User
      *
      * @param beneficiary {string}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     getPayout = async (beneficiary) => {
         if (!(await this.isResolved())) {
@@ -531,13 +546,37 @@ class Bet {
         const dbClient = await createDBTransaction();
 
         try {
-            const outcomeBalance = await outcomeToken.balanceOfChain(dbClient, beneficiary);
-
-            await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
-            await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
+            const outcomeBalance = await this._payoutChain(dbClient, outcomeToken, beneficiary);
 
             await commitDBTransaction(dbClient);
             return outcomeBalance;
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
+    }
+
+    /**
+     * Complete the Payout for a Batch of Users
+     *
+     * @param beneficiaries {string[]}
+     * @returns {Promise<void>}
+     */
+    getBatchedPayout = async (beneficiaries) => {
+        if (!(await this.isResolved())) {
+            throw new NoWeb3Exception("The Bet is not resolved yet!");
+        }
+        const outcome = (await this.getResult())['outcome'];
+        const outcomeToken = this.getOutcomeTokens()[outcome];
+
+        const dbClient = await createDBTransaction();
+
+        try {
+            for (const beneficiary of beneficiaries) {
+                await this._payoutChain(dbClient, outcomeToken, beneficiary);
+            }
+
+            await commitDBTransaction(dbClient);
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
