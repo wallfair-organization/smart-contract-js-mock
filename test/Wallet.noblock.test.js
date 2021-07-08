@@ -5,7 +5,7 @@ const Wallet = require('../erc20_moc/Wallet.noblock');
 
 const tokenName = 'EVNT';
 const EVNT = new ERC20(tokenName);
-const tokensToMint = 100 * EVNT.ONE;
+const tokensToMint = 100n * EVNT.ONE;
 
 beforeAll(async () => {
     return await setupDatabase();
@@ -77,20 +77,20 @@ test('Get Balance of Wallet', async () => {
 test('Test AMM Interactions', async () => {
     const betId = 'testAMMInteractionsOutcome';
     const testWallet = 'testAMMInteractions';
-    const investAmount = 10 * EVNT.ONE;
+    const investAmount = 10n * EVNT.ONE;
 
-    await EVNT.mint(betId, 100 * EVNT.ONE);
+    await EVNT.mint(betId, 100n * EVNT.ONE);
     await EVNT.mint(testWallet, investAmount);
 
     const bet = new Bet(betId);
-    await bet.addLiquidity(betId, 100 * EVNT.ONE);
+    await bet.addLiquidity(betId, 100n * EVNT.ONE);
 
-    await bet.buy(testWallet, investAmount, "yes", 1);
+    await bet.buy(testWallet, investAmount, 0, 1n);
 
-    await bet.sell(testWallet, 5 * EVNT.ONE, "yes");
-    await bet.sell(testWallet, 2 * EVNT.ONE, "yes");
+    await bet.sell(testWallet, 5n * EVNT.ONE, 0, BigInt(Number.MAX_SAFE_INTEGER));
+    await bet.sell(testWallet, 2n * EVNT.ONE, 0, BigInt(Number.MAX_SAFE_INTEGER));
 
     const wallet = new Wallet(testWallet);
 
-    expect(await wallet.investmentBet(betId, "yes")).toBe(3 * EVNT.ONE)
+    expect(await wallet.investmentBet(betId, 0)).toBe(3n * EVNT.ONE)
 });

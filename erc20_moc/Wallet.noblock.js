@@ -26,13 +26,13 @@ class Wallet {
 
     investmentBet = async (betId, outcome) => {
         const interactions = await viewUserInvestment(this.walletId, betId, outcome);
-        let result = 0;
+        let result = 0n;
         if (interactions.length > 0) {
             for (const interaction of interactions) {
                 if (interaction.direction === "SELL") {
-                    result -= parseInt(interaction.amount);
+                    result -= BigInt(interaction.amount);
                 } else {
-                    result += parseInt(interaction.amount);
+                    result += BigInt(interaction.amount);
                 }
             }
         }

@@ -9,10 +9,9 @@ const {
     insertReport, viewReport
 } = require('../utils/db_helper');
 
-const COLLATERAL_TOKEN = "EVNT";
-
-const WALLET_PREFIX = "BET_";
-const FEE_WALLET_PREFIX = "FEE_";
+const COLLATERAL_TOKEN = 'EVNT';
+const WALLET_PREFIX = 'BET_';
+const FEE_WALLET_PREFIX = 'FEE_';
 
 
 class Bet {
@@ -26,7 +25,7 @@ class Bet {
         this.ONE = this.collateralToken.ONE;
     }
 
-    getOutcomeKey = (outcome) => outcome.toString() + this.betId;
+    getOutcomeKey = (outcome) => outcome.toString() + '_' + this.betId;
 
     getOutcomeTokens = () => {
         const tokens = [];
@@ -85,7 +84,7 @@ class Bet {
 
     isWalletInvestedOfBalance = (balances) => {
         for (const balance of Object.values(balances)) {
-            if (balance > 0) return true;
+            if (balance > 0n) return true;
         }
         return false;
     }
@@ -101,18 +100,30 @@ class Bet {
 
             await commitDBTransaction(dbClient);
         } catch (e) {
+            console.error(e);
             await rollbackDBTransaction(dbClient);
             throw e;
         }
     }
 
     /**
+     * Some big boi BigInt Math to get the Fee Amount
+     *
+     * @param amount {bigint}
+     * @returns {bigint}
+     * @private
+     */
+    _getFee = (amount) => {
+        return (amount / BigInt(this.fee * 100)) / 100n;
+    }
+
+    /**
      * Calculate the amount of outcome-tokens able to buy using the investment amount
      *
      * @param poolBalances
-     * @param investmentAmount {number}
+     * @param investmentAmount {bigint}
      * @param outcome {number}
-     * @returns {number}
+     * @returns {bigint}
      */
     _calcBuyOfBalance = (poolBalances, investmentAmount, outcome) => {
         const outcomeKey = this.getOutcomeKey(outcome);
@@ -121,7 +132,7 @@ class Bet {
             throw new NoWeb3Exception("The outcome needs to be int the range between 0 and " + this.outcomes + ", but is \"" + outcome + "\"");
         }
 
-        const investmentAmountMinusFees = investmentAmount - Math.ceil(investmentAmount * this.fee);
+        const investmentAmountMinusFees = investmentAmount - this._getFee(investmentAmount);
         const buyTokenPoolBalance = poolBalances[outcomeKey];
         let endingOutcomeBalance = buyTokenPoolBalance;
 
@@ -129,7 +140,7 @@ class Bet {
             const poolBalanceKey = Object.keys(poolBalances)[i];
             if (poolBalanceKey !== outcomeKey) {
                 const poolBalance = poolBalances[poolBalanceKey];
-                endingOutcomeBalance = Math.ceil((endingOutcomeBalance * poolBalance) / (poolBalance + investmentAmountMinusFees));
+                endingOutcomeBalance = (endingOutcomeBalance * poolBalance) / (poolBalance + investmentAmountMinusFees);
             }
         }
 
@@ -139,9 +150,9 @@ class Bet {
     /**
      * Calculate the amount of outcome-tokens able to buy using the investment amount
      *
-     * @param investmentAmount {number}
+     * @param investmentAmount {bigint}
      * @param outcome {number}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     calcBuy = async (investmentAmount, outcome) => {
         const poolBalances = await this.getPoolBalances();
@@ -152,9 +163,9 @@ class Bet {
      * Calculate the amount of outcome-tokens able to buy using the investment amount
      *
      * @param dbClient {Client}
-     * @param investmentAmount {number}
+     * @param investmentAmount {bigint}
      * @param outcome {number}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     calcBuyChain = async (dbClient, investmentAmount, outcome) => {
         const poolBalances = await this.getPoolBalancesChain(dbClient);
@@ -165,9 +176,9 @@ class Bet {
      * Calculate the amount of outcome-tokens required to sell for the requested return amount
      *
      * @param poolBalances
-     * @param returnAmount {number}
+     * @param returnAmount {bigint}
      * @param outcome {number}
-     * @returns {number}
+     * @returns {bigint}
      */
     _calcSellOfBalance = (poolBalances, returnAmount, outcome) => {
         const outcomeKey = this.getOutcomeKey(outcome);
@@ -176,7 +187,7 @@ class Bet {
             throw new NoWeb3Exception("The outcome needs to be int the range between 0 and " + this.outcomes + ", but is \"" + outcome + "\"");
         }
 
-        const returnAmountPlusFees = returnAmount + (returnAmount * this.fee);
+        const returnAmountPlusFees = returnAmount + this._getFee(returnAmount);
         const sellTokenPoolBalance = poolBalances[outcomeKey];
         let endingOutcomeBalance = sellTokenPoolBalance;
 
@@ -184,7 +195,7 @@ class Bet {
             const poolBalanceKey = Object.keys(poolBalances)[i];
             if (poolBalanceKey !== outcomeKey) {
                 const poolBalance = poolBalances[poolBalanceKey];
-                endingOutcomeBalance = Math.ceil((endingOutcomeBalance * poolBalance) / (poolBalance - returnAmountPlusFees));
+                endingOutcomeBalance = (endingOutcomeBalance * poolBalance) / (poolBalance - returnAmountPlusFees);
             }
         }
 
@@ -195,9 +206,9 @@ class Bet {
      * Calculate the amount of outcome-tokens required to sell for the requested return amount
      *
      * @param dbClient {Client}
-     * @param returnAmount {number}
+     * @param returnAmount {bigint}
      * @param outcome {number}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     calcSellChain = async (dbClient, returnAmount, outcome) => {
         const poolBalances = await this.getPoolBalancesChain(dbClient);
@@ -207,9 +218,9 @@ class Bet {
     /**
      * Calculate the amount of outcome-tokens required to sell for the requested return amount
      *
-     * @param returnAmount {number}
+     * @param returnAmount {bigint}
      * @param outcome {number}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     calcSell = async (returnAmount, outcome) => {
         const poolBalances = await this.getPoolBalances();
@@ -219,9 +230,9 @@ class Bet {
     /**
      * Calculate the amount of EVNT-tokens returned for the requested sell amount
      *
-     * @param sellAmount {number}
+     * @param sellAmount {bigint}
      * @param outcome {number}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     calcSellFromAmount = async (sellAmount, outcome) => {
         const poolBalances = await this.getPoolBalances();
@@ -232,31 +243,38 @@ class Bet {
      * Calculate the amount of EVNT-tokens returned for the requested sell amount
      *
      * @param dbClient {Client}
-     * @param sellAmount {number}
+     * @param sellAmount {bigint}
      * @param outcome {number}
-     * @returns {Promise<number>}
+     * @returns {Promise<bigint>}
      */
     calcSellFromAmountChain = async (dbClient, sellAmount, outcome) => {
         const poolBalances = await this.getPoolBalancesChain(dbClient);
         return this._calcSellFromAmountOfBalance(poolBalances, sellAmount, outcome);
     }
 
+    /**
+     *
+     * @param poolBalances
+     * @param sellAmount {bigint}
+     * @param outcome {number}
+     * @returns {bigint}
+     * @private
+     */
     _calcSellFromAmountOfBalance = (poolBalances, sellAmount, outcome) => {
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
-        const marginalR = Math.ceil(this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome));
-        const marginalPrice = Math.ceil(outcomeToken.ONE / marginalR);
+        const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome);
 
-        let maximumRange = marginalPrice * sellAmount
-        let minimumRange = 0
-        let midRange = 0;
-        let oldMidRange = 0;
+        let maximumRange = outcomeToken.ONE * sellAmount / marginalR + 1n;
+        let minimumRange = 0n;
+        let midRange = 0n;
+        let oldMidRange = 0n;
 
         while (minimumRange <= maximumRange) {
-            midRange = Math.ceil((minimumRange + maximumRange) / 2)
+            midRange = (minimumRange + maximumRange) / 2n;
 
-            const approxSell = Math.ceil(this._calcSellOfBalance(poolBalances, midRange, outcome));
-            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1)) {
+            const approxSell = this._calcSellOfBalance(poolBalances, midRange, outcome);
+            if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1n)) {
                 break;
             }
             if (oldMidRange === midRange) {
@@ -279,9 +297,9 @@ class Bet {
     /**
      *
      * @param buyer {String}
-     * @param investmentAmount {number}
+     * @param investmentAmount {bigint}
      * @param outcome {number}
-     * @param minOutcomeTokensToBuy {number}
+     * @param minOutcomeTokensToBuy {bigint}
      * @returns {Promise<any>}
      */
     buy = async (buyer, investmentAmount, outcome, minOutcomeTokensToBuy) => {
@@ -292,9 +310,8 @@ class Bet {
         const dbClient = await createDBTransaction();
 
         try {
-
             const outcomeTokensToBuy = await this.calcBuyChain(dbClient, investmentAmount, outcome);
-            const feeAmount = Math.ceil(investmentAmount * this.fee);
+            const feeAmount = this._getFee(investmentAmount);
             const outcomeToken = this.getOutcomeTokens()[outcome];
 
             if (outcomeTokensToBuy < minOutcomeTokensToBuy) {
@@ -324,9 +341,9 @@ class Bet {
     /**
      *
      * @param seller {String}
-     * @param returnAmount {number}
+     * @param returnAmount {bigint}
      * @param outcome {number}
-     * @param maxOutcomeTokensToSell {number}
+     * @param maxOutcomeTokensToSell {bigint}
      * @returns {Promise<any>}
      */
     sell = async (seller, returnAmount, outcome, maxOutcomeTokensToSell) => {
@@ -339,7 +356,7 @@ class Bet {
         try {
 
             const outcomeTokensToSell = await this.calcSellChain(dbClient, returnAmount, outcome);
-            const feeAmount = Math.ceil(returnAmount * this.fee);
+            const feeAmount = this._getFee(returnAmount);
             const outcomeToken = this.getOutcomeTokens()[outcome];
 
             if (outcomeTokensToSell > maxOutcomeTokensToSell) {
@@ -369,9 +386,9 @@ class Bet {
     /**
      *
      * @param seller {String}
-     * @param sellAmount {number}
+     * @param sellAmount {bigint}
      * @param outcome {number}
-     * @param minReturnAmount {number}
+     * @param minReturnAmount {bigint}
      * @returns {Promise<any>}
      */
     sellAmount = async (seller, sellAmount, outcome, minReturnAmount) => {
@@ -383,7 +400,7 @@ class Bet {
 
         try {
             const returnAmount = await this.calcSellFromAmountChain(dbClient, sellAmount, outcome);
-            const feeAmount = Math.ceil(returnAmount * this.fee);
+            const feeAmount = this._getFee(returnAmount);
             const outcomeToken = this.getOutcomeTokens()[outcome];
 
             if (returnAmount < minReturnAmount) {
