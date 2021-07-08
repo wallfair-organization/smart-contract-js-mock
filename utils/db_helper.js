@@ -30,7 +30,7 @@ const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 
 const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
 const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
-const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1;';
+const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
 const GET_LIMIT_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY owner, balance DESC LIMIT $2;';
 
 const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
@@ -323,6 +323,21 @@ async function insertReport(bet_id, reporter, outcome, timestamp) {
 }
 
 /**
+ * Insert a new Report to resolve a bet
+ * Build for Transactions
+ *
+ * @param client {Client}
+ * @param bet_id {String}
+ * @param reporter {String}
+ * @param outcome {number}
+ * @param timestamp {Date}
+ * @returns {Promise<void>}
+ */
+async function insertReportChain(client, bet_id, reporter, outcome, timestamp) {
+    await client.query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
+}
+
+/**
  * view the report of a bet
  *
  * @param bet_id {String}
@@ -355,6 +370,7 @@ module.exports = {
     viewTransactionOfUserBySymbol,
     viewTransactionOfUser,
     insertReport,
+    insertReportChain,
     viewReport,
     viewUserInvestment
 };
