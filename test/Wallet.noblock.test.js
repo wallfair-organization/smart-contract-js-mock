@@ -8,8 +8,11 @@ const EVNT = new ERC20(tokenName);
 const tokensToMint = 100n * EVNT.ONE;
 
 beforeAll(async () => {
-    await teardownDatabase();
     return await setupDatabase();
+});
+
+afterAll(async () => {
+    return await teardownDatabase();
 });
 
 test('Get Transactions', async () => {

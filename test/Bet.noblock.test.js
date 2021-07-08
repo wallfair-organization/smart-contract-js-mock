@@ -10,16 +10,15 @@ const investAmount = 10n * EVNT.ONE;
 jest.setTimeout(1000000);
 
 beforeAll(async () => {
-    await teardownDatabase();
-    await setupDatabase();
-})
-
-beforeEach(async () => {
-    await EVNT.mint(liquidityProviderWallet, liquidityAmount);
+    return await setupDatabase();
 });
 
 afterAll(async () => {
-    // return await teardownDatabase();
+    return await teardownDatabase();
+});
+
+beforeEach(async () => {
+    await EVNT.mint(liquidityProviderWallet, liquidityAmount);
 });
 
 test('Add Liquidity', async () => {
