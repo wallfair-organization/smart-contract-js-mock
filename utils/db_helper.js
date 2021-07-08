@@ -28,7 +28,7 @@ const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
 const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
 const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1;';
-const GET_LIMIT_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY balance DESC LIMIT $2;';
+const GET_LIMIT_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY owner, balance DESC LIMIT $2;';
 
 const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
 const GET_USER_INVESTMENT = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction;';
