@@ -1,5 +1,6 @@
 const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
+const Wallet = require("./Wallet.noblock");
 const {
     createDBTransaction,
     rollbackDBTransaction,
@@ -552,6 +553,32 @@ class Bet {
 
             await commitDBTransaction(dbClient);
             return outcomeBalance;
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
+    }
+
+    refund = async () => {
+        const dbClient = await createDBTransaction();
+
+        try {
+            await insertReportChain(dbClient, this.betId, "Refund", -1, new Date());
+            for (let outcome = 0; outcome < this.outcomes; outcome++) {
+                const beneficiaries = (await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome))).map(x => {
+                    return {"owner": x.owner, "balance": BigInt(x.balance)}
+                }).filter(x => !x.owner.startsWith(WALLET_PREFIX));
+
+                for (const beneficiary of beneficiaries) {
+                    const wallet = new Wallet(beneficiary.owner);
+                    const refundAmount = await wallet.investmentBet(this.betId, outcome);
+                    console.log(refundAmount);
+                    await this.getOutcomeToken(outcome).burnChain(dbClient, beneficiary.owner, beneficiary.balance);
+                    await this.collateralToken.mintChain(dbClient, wallet.walletId, refundAmount);
+                }
+            }
+
+            await commitDBTransaction(dbClient);
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
