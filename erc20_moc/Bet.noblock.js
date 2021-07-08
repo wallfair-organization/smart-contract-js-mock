@@ -6,6 +6,8 @@ const {
     commitDBTransaction,
     insertAMMInteraction,
     viewAllBalancesOfToken,
+    getAllBalancesOfToken,
+    insertReportChain,
     insertReport, viewReport
 } = require('../utils/db_helper');
 
@@ -570,6 +572,41 @@ class Bet {
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
         const dbClient = await createDBTransaction();
+
+        try {
+            for (const beneficiary of beneficiaries) {
+                await this._payoutChain(dbClient, outcomeToken, beneficiary);
+            }
+
+            await commitDBTransaction(dbClient);
+        } catch (e) {
+            await rollbackDBTransaction(dbClient);
+            throw e;
+        }
+    }
+
+    /**
+     * Complete the Payout for a Batch of Users
+     *
+     * @param reporter {string}
+     * @param outcome {number}
+     * @returns {Promise<void>}
+     */
+    resolveAndPayout = async (reporter, outcome) => {
+        if (outcome < 0 || outcome > this.outcomes) {
+            throw new NoWeb3Exception("The outcome needs to be int the range between 0 and " + this.outcomes + ", but is \"" + outcome + "\"");
+        }
+
+        if (await this.isResolved()) {
+            throw new NoWeb3Exception("The Bet is already resolved!");
+        }
+
+        const outcomeToken = this.getOutcomeTokens()[outcome];
+        const dbClient = await createDBTransaction();
+
+        await insertReportChain(dbClient, this.betId, reporter, outcome, new Date());
+
+        const beneficiaries = (await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome))).map(x => x.owner);
 
         try {
             for (const beneficiary of beneficiaries) {

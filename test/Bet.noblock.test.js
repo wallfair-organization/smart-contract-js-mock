@@ -184,18 +184,35 @@ test('Test Payout', async () => {
 
 test('Test batched Payout', async () => {
     const testBetId = 'testBatchedPayout';
-    const batchedPayoutWallet1 = 'batchedPayoutWallet1';
-    const batchedPayoutWallet2 = 'batchedPayoutWallet2';
+    const investorWalletId1 = 'batchedPayoutWallet1';
+    const investorWalletId2 = 'batchedPayoutWallet2';
 
     const bet = new Bet(testBetId, 1);
 
     await EVNT.mint(bet.walletId, 2n * investAmount);
-    await bet.getOutcomeToken(0).mint(batchedPayoutWallet1, investAmount);
-    await bet.getOutcomeToken(0).mint(batchedPayoutWallet2, investAmount);
+    await bet.getOutcomeToken(0).mint(investorWalletId1, investAmount);
+    await bet.getOutcomeToken(0).mint(investorWalletId2, investAmount);
 
     await bet.resolveBet('testBatchedPayout', 0);
-    await bet.getBatchedPayout([batchedPayoutWallet1, batchedPayoutWallet2]);
+    await bet.getBatchedPayout([investorWalletId1, investorWalletId2]);
 
-    expect(await EVNT.balanceOf(batchedPayoutWallet1)).toBe(investAmount);
-    expect(await EVNT.balanceOf(batchedPayoutWallet2)).toBe(investAmount);
+    expect(await EVNT.balanceOf(investorWalletId1)).toBe(investAmount);
+    expect(await EVNT.balanceOf(investorWalletId2)).toBe(investAmount);
+});
+
+test('Test resolve and batched Payout', async () => {
+    const testBetId = 'testResolveAndBatchedPayout';
+    const investorWalletId1 = 'resolveAndBatchedPayoutWallet1';
+    const investorWalletId2 = 'resolveAndBatchedPayoutWallet2';
+
+    const bet = new Bet(testBetId, 1);
+
+    await EVNT.mint(bet.walletId, 2n * investAmount);
+    await bet.getOutcomeToken(0).mint(investorWalletId1, investAmount);
+    await bet.getOutcomeToken(0).mint(investorWalletId2, investAmount);
+
+    await bet.resolveAndPayout('testBatchedPayout', 0);
+
+    expect(await EVNT.balanceOf(investorWalletId1)).toBe(investAmount);
+    expect(await EVNT.balanceOf(investorWalletId2)).toBe(investAmount);
 });
