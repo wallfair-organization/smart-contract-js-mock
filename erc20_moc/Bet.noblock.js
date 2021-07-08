@@ -264,12 +264,8 @@ class Bet {
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
         const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome);
-        let marginalPrice = outcomeToken.ONE / marginalR;
-        if (marginalPrice <= 0) {
-            marginalPrice = 1n;
-        }
 
-        let maximumRange = marginalPrice * sellAmount;
+        let maximumRange = outcomeToken.ONE * sellAmount / marginalR + 1n;
         let minimumRange = 0n;
         let midRange = 0n;
         let oldMidRange = 0n;
