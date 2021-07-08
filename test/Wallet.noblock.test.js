@@ -7,6 +7,8 @@ const tokenName = 'EVNT';
 const EVNT = new ERC20(tokenName);
 const tokensToMint = 100n * EVNT.ONE;
 
+jest.setTimeout(1000000);
+
 beforeAll(async () => {
     return await setupDatabase();
 });
