@@ -10,6 +10,13 @@ const pool = new Pool({
     ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {rejectUnauthorized: false})
 });
 
+const DIRECTION = {
+    BUY: 'BUY',
+    SELL: 'SELL',
+    PAYOUT: 'PAYOUT',
+    REFUND: 'REFUND'
+};
+
 const BEGIN = 'BEGIN';
 const COMMIT = 'COMMIT';
 const ROLLBACK = 'ROLLBACK';
@@ -35,7 +42,7 @@ const GET_LIMIT_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = 
 
 const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
 const GET_USER_INVESTMENT = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction;';
-const GET_BET_INVESTORS = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, bet, direction;';
+const GET_BET_INVESTORS = 'SELECT buyer, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, direction;';
 const GET_TRANSACTIONS_OF_USER = 'SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1);';
 const GET_TRANSACTIONS_OF_USER_AND_TOKEN = 'SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2);';
 
@@ -363,6 +370,7 @@ async function viewReport(bet_id) {
 }
 
 module.exports = {
+    DIRECTION,
     setupDatabase,
     teardownDatabase,
     createDBTransaction,
