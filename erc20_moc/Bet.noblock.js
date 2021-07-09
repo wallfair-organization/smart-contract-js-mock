@@ -1,7 +1,7 @@
 const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
-const Wallet = require("./Wallet.noblock");
 const {
+    DIRECTION,
     createDBTransaction,
     rollbackDBTransaction,
     commitDBTransaction,
@@ -385,7 +385,7 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
             await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
 
-            await insertAMMInteraction(dbClient, buyer, this.betId, outcome, "BUY", investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
+            await insertAMMInteraction(dbClient, buyer, this.betId, outcome, DIRECTION.BUY, investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
 
             await commitDBTransaction(dbClient);
 
@@ -430,7 +430,7 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
 
-            await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, outcomeTokensToSell, new Date());
+            await insertAMMInteraction(dbClient, seller, this.betId, outcome, DIRECTION.SELL, returnAmount, feeAmount, outcomeTokensToSell, new Date());
 
             await commitDBTransaction(dbClient);
 
@@ -474,7 +474,7 @@ class Bet {
             await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
 
-            await insertAMMInteraction(dbClient, seller, this.betId, outcome, "SELL", returnAmount, feeAmount, sellAmount, new Date());
+            await insertAMMInteraction(dbClient, seller, this.betId, outcome, DIRECTION.SELL, returnAmount, feeAmount, sellAmount, new Date());
 
             await commitDBTransaction(dbClient);
 
@@ -532,6 +532,11 @@ class Bet {
         const outcomeBalance = await outcomeToken.balanceOfChain(dbClient, beneficiary);
         await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
         await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
+
+        await insertAMMInteraction(dbClient, beneficiary, this.betId,
+            parseInt(outcomeToken.symbol.replace(this.betId, '')), DIRECTION.PAYOUT,
+            outcomeBalance, 0n, outcomeBalance, new Date());
+
         return outcomeBalance;
     }
 
@@ -577,21 +582,31 @@ class Bet {
             await insertReportChain(dbClient, this.betId, "Refund", OUTCOME_BET_REFUNDED, new Date());
             const ammInteractions = await getBetInvestors(dbClient, this.betId);
             const beneficiaries = {};
+            const notEligible = [];
 
             for (const interaction of ammInteractions) {
-                let result = beneficiaries[interaction.buyer] || 0n;
-                if (interaction.direction === "SELL") {
-                    result -= BigInt(interaction.amount);
-                } else {
-                    result += BigInt(interaction.amount);
+                const buyer = interaction.buyer;
+                if (!notEligible.includes(buyer)) {
+                    let result = beneficiaries[buyer] || 0n;
+                    if (interaction.direction === DIRECTION.PAYOUT || interaction.direction === DIRECTION.REFUND) {
+                        notEligible.push(buyer);
+                    } else if (interaction.direction === DIRECTION.SELL) {
+                        result -= BigInt(interaction.amount);
+                    } else if (interaction.direction === DIRECTION.BUY) {
+                        result += BigInt(interaction.amount);
+                    }
+                    beneficiaries[buyer] = result;
                 }
-                beneficiaries[interaction.buyer] = result;
             }
 
             for (const beneficiary in beneficiaries) {
                 const refundAmount = beneficiaries[beneficiary];
                 if (refundAmount > 0) {
                     await this.collateralToken.mintChain(dbClient, beneficiary, refundAmount);
+
+                    await insertAMMInteraction(dbClient, beneficiary, this.betId,
+                        OUTCOME_BET_REFUNDED, DIRECTION.REFUND,
+                        refundAmount, 0n, 0n, new Date());
                 }
             }
 
