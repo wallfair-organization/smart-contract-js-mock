@@ -16,6 +16,7 @@ const {
 const COLLATERAL_TOKEN = 'EVNT';
 const WALLET_PREFIX = 'BET_';
 const FEE_WALLET_PREFIX = 'FEE_';
+const OUTCOME_BET_REFUNDED = -1;
 
 
 class Bet {
@@ -547,7 +548,7 @@ class Bet {
 
         const outcome = (await this.getResult())['outcome'];
 
-        if (outcome === -1) {
+        if (outcome === OUTCOME_BET_REFUNDED) {
             throw new NoWeb3Exception("The Bet has been refunded!");
         }
 
@@ -573,7 +574,7 @@ class Bet {
         const dbClient = await createDBTransaction();
 
         try {
-            await insertReportChain(dbClient, this.betId, "Refund", -1, new Date());
+            await insertReportChain(dbClient, this.betId, "Refund", OUTCOME_BET_REFUNDED, new Date());
             const ammInteractions = await getBetInvestors(dbClient, this.betId);
             const beneficiaries = {};
 
@@ -614,7 +615,7 @@ class Bet {
 
         const outcome = (await this.getResult())['outcome'];
 
-        if (outcome === -1) {
+        if (outcome === OUTCOME_BET_REFUNDED) {
             throw new NoWeb3Exception("The Bet has been refunded!");
         }
 
