@@ -9,7 +9,8 @@ const {
     viewAllBalancesOfToken,
     getAllBalancesOfToken,
     insertReportChain,
-    insertReport, viewReport
+    insertReport, viewReport,
+    getBetInvestors
 } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = 'EVNT';
@@ -543,9 +544,14 @@ class Bet {
         if (!(await this.isResolved())) {
             throw new NoWeb3Exception("The Bet is not resolved yet!");
         }
-        const outcome = (await this.getResult())['outcome'];
-        const outcomeToken = this.getOutcomeTokens()[outcome];
 
+        const outcome = (await this.getResult())['outcome'];
+
+        if (outcome === -1) {
+            throw new NoWeb3Exception("The Bet has been refunded!");
+        }
+
+        const outcomeToken = this.getOutcomeTokens()[outcome];
         const dbClient = await createDBTransaction();
 
         try {
@@ -560,21 +566,31 @@ class Bet {
     }
 
     refund = async () => {
+        if (await this.isResolved()) {
+            throw new NoWeb3Exception("The Bet is already resolved!");
+        }
+
         const dbClient = await createDBTransaction();
 
         try {
             await insertReportChain(dbClient, this.betId, "Refund", -1, new Date());
-            for (let outcome = 0; outcome < this.outcomes; outcome++) {
-                const beneficiaries = (await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome))).map(x => {
-                    return {"owner": x.owner, "balance": BigInt(x.balance)}
-                }).filter(x => !x.owner.startsWith(WALLET_PREFIX));
+            const ammInteractions = await getBetInvestors(dbClient, this.betId);
+            const beneficiaries = {};
 
-                for (const beneficiary of beneficiaries) {
-                    const wallet = new Wallet(beneficiary.owner);
-                    const refundAmount = await wallet.investmentBet(this.betId, outcome);
-                    console.log(refundAmount);
-                    await this.getOutcomeToken(outcome).burnChain(dbClient, beneficiary.owner, beneficiary.balance);
-                    await this.collateralToken.mintChain(dbClient, wallet.walletId, refundAmount);
+            for (const interaction of ammInteractions) {
+                let result = beneficiaries[interaction.buyer] || 0n;
+                if (interaction.direction === "SELL") {
+                    result -= BigInt(interaction.amount);
+                } else {
+                    result += BigInt(interaction.amount);
+                }
+                beneficiaries[interaction.buyer] = result;
+            }
+
+            for (const beneficiary in beneficiaries) {
+                const refundAmount = beneficiaries[beneficiary];
+                if (refundAmount > 0) {
+                    await this.collateralToken.mintChain(dbClient, beneficiary, refundAmount);
                 }
             }
 
@@ -595,7 +611,13 @@ class Bet {
         if (!(await this.isResolved())) {
             throw new NoWeb3Exception("The Bet is not resolved yet!");
         }
+
         const outcome = (await this.getResult())['outcome'];
+
+        if (outcome === -1) {
+            throw new NoWeb3Exception("The Bet has been refunded!");
+        }
+
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
         const dbClient = await createDBTransaction();

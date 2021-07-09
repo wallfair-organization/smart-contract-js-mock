@@ -32,8 +32,6 @@ class ERC20 {
         let balance = 0n;
         if (balances.length > 0) {
             balance = BigInt(balances[0].balance);
-        } else {
-            console.debug("[ERC-20-MOC]", "Did not find a balance. Defaulting to 0", user, balances)
         }
         return balance;
     }
