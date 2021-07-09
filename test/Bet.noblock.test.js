@@ -224,20 +224,39 @@ test('Test resolve and batched Payout', async () => {
 
 test('Test Refund Bet', async () => {
     const testBetId = 'testRefundBet';
-    const investorWalletId = 'testRefundWallet';
+    const investorWalletId1 = 'testRefundWallet1';
+    const investorWalletId2 = 'testRefundWallet2';
+    const investorWalletId3 = 'testRefundWallet3';
     const outcomeIndex = 0;
 
-    await EVNT.mint(investorWalletId, investAmount);
+    await EVNT.mint(investorWalletId1, investAmount);
+    await EVNT.mint(investorWalletId2, investAmount);
+    await EVNT.mint(investorWalletId3, investAmount);
 
     const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
-    await bet.buy(investorWalletId, investAmount, outcomeIndex, 1n);
+    await bet.buy(investorWalletId1, investAmount, outcomeIndex, 1n);
 
-    expect(await EVNT.balanceOf(investorWalletId)).toBe(0n);
-    expect(await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId)).toBeGreaterThan(0n);
+    expect(await EVNT.balanceOf(investorWalletId1)).toBe(0n);
+    expect(await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId1)).toBeGreaterThan(0n);
+
+    await bet.buy(investorWalletId2, investAmount, outcomeIndex, 1n);
+    await bet.sell(investorWalletId2, investAmount / 2n, outcomeIndex, investAmount);
+
+    expect(await EVNT.balanceOf(investorWalletId2)).toBe(investAmount / 2n);
+    expect(await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId2)).toBeGreaterThan(0n);
+
+    await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId3, investAmount)
+    await bet.buy(investorWalletId3, investAmount, outcomeIndex, 1n);
+    await bet.sell(investorWalletId3, investAmount + bet.ONE, outcomeIndex, investAmount * 2n);
+
+    expect(await EVNT.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
+    expect(await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId3)).toBeGreaterThan(0n);
 
     await bet.refund();
 
-    expect(await EVNT.balanceOf(investorWalletId)).toBe(investAmount);
+    expect(await EVNT.balanceOf(investorWalletId1)).toBe(investAmount);
+    expect(await EVNT.balanceOf(investorWalletId2)).toBe(investAmount);
+    expect(await EVNT.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
 });
