@@ -32,8 +32,6 @@ class ERC20 {
         let balance = 0n;
         if (balances.length > 0) {
             balance = BigInt(balances[0].balance);
-        } else {
-            console.debug("[ERC-20-MOC]", "Did not find a balance. Defaulting to 0", user, balances)
         }
         return balance;
     }
@@ -129,7 +127,7 @@ class ERC20 {
             await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
             await insertTransaction(dbClient, "", receiver, amount, this.symbol, trx_time);
         } else {
-            throw new NoWeb3Exception("Spending negative amounts is not possible!");
+            throw new NoWeb3Exception("Minting negative amounts is not possible!");
         }
     }
 
@@ -152,7 +150,7 @@ class ERC20 {
                 throw new NoWeb3Exception(e.message);
             }
         } else {
-            throw new NoWeb3Exception("Spending negative amounts is not possible!");
+            throw new NoWeb3Exception("Minting negative amounts is not possible!");
         }
     }
 
@@ -189,7 +187,7 @@ class ERC20 {
      * @returns {Promise<void>}
      */
     burn = async (sponsor, amount) => {
-        if (amount > 0) {
+        if (amount > 0n) {
             const dbClient = await createDBTransaction();
 
             try {
