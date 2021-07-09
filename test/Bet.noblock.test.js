@@ -240,5 +240,4 @@ test('Test Refund Bet', async () => {
     await bet.refund();
 
     expect(await EVNT.balanceOf(investorWalletId)).toBe(investAmount);
-    expect(await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId)).toBe(0n);
 });
