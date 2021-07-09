@@ -1,5 +1,6 @@
 const ERC20 = require("./Erc20.noblock");
 const {
+    DIRECTION,
     viewAllBalancesOfUser,
     viewTransactionOfUser,
     viewAMMInteractionsOfUser,
@@ -29,7 +30,9 @@ class Wallet {
         let result = 0n;
         if (interactions.length > 0) {
             for (const interaction of interactions) {
-                if (interaction.direction === "SELL") {
+                if (interaction.direction === DIRECTION.PAYOUT || interaction.direction === DIRECTION.REFUND) {
+                    return 0n;
+                } else if (interaction.direction === DIRECTION.SELL) {
                     result -= BigInt(interaction.amount);
                 } else {
                     result += BigInt(interaction.amount);
