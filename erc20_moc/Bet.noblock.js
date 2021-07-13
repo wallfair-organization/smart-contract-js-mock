@@ -328,19 +328,28 @@ class Bet {
 
         const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome);
 
+
         let maximumRange = outcomeToken.ONE * sellAmount / marginalR + 1n;
+        console.log('marginalR', marginalR);
+        console.log('maximumRange', maximumRange);
+
         let minimumRange = 0n;
         let midRange = 0n;
         let oldMidRange = 0n;
+        // 490164n 245082n 0n 494964n 989886n
 
+        // 490130n 490128n 490126n 989886n 989886n
         while (minimumRange <= maximumRange) {
             midRange = (minimumRange + maximumRange) / 2n;
 
             const approxSell = this._calcSellOfBalance(poolBalances, midRange, outcome);
+            console.log(minimumRange, midRange, maximumRange, approxSell);
             if (approxSell === sellAmount || (approxSell < sellAmount && sellAmount - approxSell <= 1n)) {
                 break;
             }
             if (oldMidRange === midRange) {
+                console.log("ded")
+                break;
                 if (minimumRange === maximumRange) {
                     break;
                 }
