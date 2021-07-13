@@ -269,5 +269,5 @@ test('Test Wired Jonas Case', async () => {
     await bet.getOutcomeToken(0).mint(bet.walletId, 2146490114n);
     await bet.getOutcomeToken(1).mint(bet.walletId, 2147480000n);
 
-    await bet.calcSellFromAmount(989886n, 0);
+    expect(await bet.calcSellFromAmount(989886n, 0)).toBe(490099n);
 });
