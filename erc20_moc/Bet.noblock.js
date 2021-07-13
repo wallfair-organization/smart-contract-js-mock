@@ -339,7 +339,7 @@ class Bet {
         // 490164n 245082n 0n 494964n 989886n
 
         // 490130n 490128n 490126n 989886n 989886n
-        while (minimumRange <= maximumRange) {
+        while (maximumRange - minimumRange > 1) {
             midRange = (minimumRange + maximumRange) / 2n;
 
             const approxSell = this._calcSellOfBalance(poolBalances, midRange, outcome);
@@ -348,8 +348,6 @@ class Bet {
                 break;
             }
             if (oldMidRange === midRange) {
-                console.log("ded")
-                break;
                 if (minimumRange === maximumRange) {
                     break;
                 }
