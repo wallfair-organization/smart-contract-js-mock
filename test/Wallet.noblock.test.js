@@ -94,5 +94,5 @@ test('Test AMM Interactions', async () => {
 
     const wallet = new Wallet(testWallet);
 
-    expect(await wallet.investmentBet(betId, 0)).toBe(3n * EVNT.ONE)
+    expect(await wallet.investmentBet(betId, 0)).toBe(28300n)
 });

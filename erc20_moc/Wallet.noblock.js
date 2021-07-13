@@ -33,9 +33,9 @@ class Wallet {
                 if (interaction.direction === DIRECTION.PAYOUT || interaction.direction === DIRECTION.REFUND) {
                     return 0n;
                 } else if (interaction.direction === DIRECTION.SELL) {
-                    result -= BigInt(interaction.amount);
+                    result -= BigInt(interaction.amount) + BigInt(interaction.fee);
                 } else {
-                    result += BigInt(interaction.amount);
+                    result += BigInt(interaction.amount) - BigInt(interaction.fee);
                 }
             }
         }
