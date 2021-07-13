@@ -326,14 +326,15 @@ class Bet {
     _calcSellFromAmountOfBalance = (poolBalances, sellAmount, outcome) => {
         const outcomeToken = this.getOutcomeTokens()[outcome];
 
-        const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE, outcome);
+        const marginalR = this._calcSellOfBalance(poolBalances, this.collateralToken.ONE / 10n, outcome) - 1n;
 
-        let maximumRange = outcomeToken.ONE * sellAmount / marginalR + 1n;
+        let maximumRange = outcomeToken.ONE * sellAmount / (marginalR * 10n);
+
         let minimumRange = 0n;
         let midRange = 0n;
         let oldMidRange = 0n;
 
-        while (minimumRange <= maximumRange) {
+        while (maximumRange - minimumRange > 1) {
             midRange = (minimumRange + maximumRange) / 2n;
 
             const approxSell = this._calcSellOfBalance(poolBalances, midRange, outcome);
@@ -671,7 +672,8 @@ class Bet {
 
         await insertReportChain(dbClient, this.betId, reporter, outcome, new Date());
 
-        const beneficiaries = (await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome))).map(x => x.owner);
+        const results = await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome));
+        const beneficiaries = results.map(x => x.owner);
 
         try {
             for (const beneficiary of beneficiaries) {
@@ -679,6 +681,8 @@ class Bet {
             }
 
             await commitDBTransaction(dbClient);
+
+            return results;
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;

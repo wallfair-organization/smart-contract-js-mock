@@ -260,3 +260,14 @@ test('Test Refund Bet', async () => {
     expect(await EVNT.balanceOf(investorWalletId2)).toBe(investAmount);
     expect(await EVNT.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
 });
+
+test('Test Wired Jonas Case', async () => {
+    const testBetId = 'JonasBet';
+
+    const bet = new Bet(testBetId, 2);
+
+    await bet.getOutcomeToken(0).mint(bet.walletId, 2146490114n);
+    await bet.getOutcomeToken(1).mint(bet.walletId, 2147480000n);
+
+    expect(await bet.calcSellFromAmount(989886n, 0)).toBe(490099n);
+});
