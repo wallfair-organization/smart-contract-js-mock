@@ -672,7 +672,8 @@ class Bet {
 
         await insertReportChain(dbClient, this.betId, reporter, outcome, new Date());
 
-        const beneficiaries = (await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome))).map(x => x.owner);
+        const results = await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome));
+        const beneficiaries = results.map(x => x.owner);
 
         try {
             for (const beneficiary of beneficiaries) {
@@ -680,6 +681,8 @@ class Bet {
             }
 
             await commitDBTransaction(dbClient);
+
+            return results;
         } catch (e) {
             await rollbackDBTransaction(dbClient);
             throw e;
