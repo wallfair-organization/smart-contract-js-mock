@@ -1,4 +1,5 @@
 const {Pool, Client} = require('pg');
+const fs = require('fs');
 
 // ToDo: Put into Configfile
 const pool = new Pool({
@@ -7,7 +8,12 @@ const pool = new Pool({
     database: process.env.POSTGRES_DB || 'postgres',
     password: process.env.POSTGRES_PASSWORD || 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
     port: process.env.POSTGRES_PORT || 5432,
-    ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {rejectUnauthorized: false})
+    ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {
+        rejectUnauthorized: false,
+        ca: fs.readFileSync(process.env.POSTGRES_CA).toString(),
+        key: fs.readFileSync(process.env.POSTGRES_KEY).toString(),
+        cert: fs.readFileSync(process.env.POSTGRES_CERT).toString(),
+    })
 });
 
 const DIRECTION = {
