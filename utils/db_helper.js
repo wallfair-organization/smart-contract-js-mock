@@ -10,9 +10,7 @@ const pool = new Pool({
     port: process.env.POSTGRES_PORT || 5432,
     ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {
         rejectUnauthorized: false,
-        ca: fs.readFileSync(process.env.POSTGRES_CA).toString(),
-        key: fs.readFileSync(process.env.POSTGRES_KEY).toString(),
-        cert: fs.readFileSync(process.env.POSTGRES_CERT).toString(),
+        ca: fs.readFileSync(process.env.POSTGRES_CA).toString()
     })
 });
 
