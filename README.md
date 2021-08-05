@@ -1,7 +1,4 @@
 # smart-contract-js-mock
-A collection of JavaScript classes to work as a replacement for the Smart Contracts. 
+A collection of JavaScript classes to emulate the mechanics of the Smart Contracts that will be deployed by Wallfair.
 
-**Only intended to be used in the MVP and not production!!!**
-
-## Copyright 
-2021 - Konstantin Ullrich
+This code is intended to be used only for the MVP launch, and will eventually be replaced by actual Smart Contracts.
