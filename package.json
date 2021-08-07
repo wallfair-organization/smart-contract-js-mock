@@ -8,8 +8,8 @@
     "test": "jest -i"
   },
   "keywords": [],
-  "author": "Konstantin Ullrich",
-  "license": "ISC",
+  "author": "Wallfair",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "pg": "^8.6.0"
   },
