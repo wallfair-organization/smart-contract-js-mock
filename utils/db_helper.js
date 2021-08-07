@@ -1,12 +1,11 @@
 const {Pool, Client} = require('pg');
 const fs = require('fs');
 
-// ToDo: Put into Configfile
 const pool = new Pool({
     user: process.env.POSTGRES_USER || 'postgres',
-    host: process.env.POSTGRES_HOST || 'db.qscoxswxnvdajazopzcd.supabase.co',
-    database: process.env.POSTGRES_DB || 'postgres',
-    password: process.env.POSTGRES_PASSWORD || 'H3m^iGHGSK68hTdXnb3yEENGj36Vf$',
+    host: process.env.POSTGRES_HOST || 'localhost',
+    database: process.env.POSTGRES_DB || 'testdb',
+    password: process.env.POSTGRES_PASSWORD || 'postgres',
     port: process.env.POSTGRES_PORT || 5432,
     ssl: (process.env.POSTGRES_DISABLE_SSL === 'true' ? false : {
         rejectUnauthorized: false,

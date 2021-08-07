@@ -5,10 +5,32 @@ on:
   pull_request:
     branches:
       - trunk
+  push:
+    branches:
+      - trunk
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_DB: testdb
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DISABLE_SSL: true
+
+    services:
+      postgres:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+
     steps:
       - uses: actions/checkout@v2
       - name: Install modules
