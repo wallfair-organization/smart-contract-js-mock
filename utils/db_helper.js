@@ -322,14 +322,26 @@ async function viewUserInvestment(user, bet, outcome) {
 
 /**
  * Get all transactions of a user with a specific token
+ *
+ * @param client {Client}
+ * @param bet {String}
+ * @returns {Promise<*>}
+ */
+async function getBetInvestors(bet) {
+    const res = await pool.query(GET_BET_INVESTORS, [bet]);
+    return res.rows;
+}
+
+/**
+ * Get all transactions of a user with a specific token
  * Build for Transactions
  *
  * @param client {Client}
  * @param bet {String}
  * @returns {Promise<*>}
  */
-async function getBetInvestors(client, bet) {
-    const res = await pool.query(GET_BET_INVESTORS, [bet]);
+ async function getBetInvestorsChain(client, bet) {
+    const res = await client.query(GET_BET_INVESTORS, [bet]);
     return res.rows;
 }
 
@@ -398,5 +410,6 @@ module.exports = {
     insertReportChain,
     viewReport,
     viewUserInvestment,
+    getBetInvestorsChain,
     getBetInvestors
 };

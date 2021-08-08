@@ -1,4 +1,4 @@
-const { setupDatabase, teardownDatabase, viewAMMInteractionsOfUser } = require('../utils/db_helper');
+const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
 const Bet = require('../erc20_moc/Bet.noblock');
 
@@ -261,8 +261,8 @@ test('Test Refund Bet', async () => {
     expect(await EVNT.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
 });
 
-test.only('Get AMM Interactions', async () => {
-    const testBetId = 'testPayout';
+test('Get AMM Interactions', async () => {
+    const testBetId = 'getAmmInteractionsBet';
     const investorWalletId1 = 'wallet1';
 
     await EVNT.mint(investorWalletId1, investAmount);
