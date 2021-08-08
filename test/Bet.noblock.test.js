@@ -1,4 +1,4 @@
-const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
+const { setupDatabase, teardownDatabase, viewAMMInteractionsOfUser } = require('../utils/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
 const Bet = require('../erc20_moc/Bet.noblock');
 
@@ -261,7 +261,37 @@ test('Test Refund Bet', async () => {
     expect(await EVNT.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
 });
 
-test('Test Wired Jonas Case', async () => {
+test.only('Get AMM Interactions', async () => {
+    const testBetId = 'testPayout';
+    const investorWalletId1 = 'wallet1';
+
+    await EVNT.mint(investorWalletId1, investAmount);
+
+    const bet = new Bet(testBetId, 2);
+    await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+    await bet.buy(investorWalletId1, investAmount, 0, 1n);
+    await bet.sell(investorWalletId1, investAmount / 2n, 0, investAmount);
+
+    await bet.resolveBet('testPayout', 0);
+    await bet.getPayout(investorWalletId1);
+
+    const ammInteractions = await bet.getUserAmmInteractions();
+    expect(ammInteractions.length).toEqual(3);
+
+    expectInteraction = (f) => expect(ammInteractions).toEqual(
+        expect.arrayContaining([
+            expect.objectContaining(f)
+        ])
+    )
+    
+    // we expect to have BUY, SELL & PAYOUT interaction
+    expectInteraction({ buyer: 'wallet1', direction: 'BUY'});
+    expectInteraction({ buyer: 'wallet1', direction: 'SELL'});
+    expectInteraction({ buyer: 'wallet1', direction: 'PAYOUT'});
+});
+
+test('Test Weird Jonas Case', async () => {
     const testBetId = 'JonasBet';
 
     const bet = new Bet(testBetId, 2);
