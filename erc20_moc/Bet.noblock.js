@@ -10,7 +10,8 @@ const {
     getAllBalancesOfToken,
     insertReportChain,
     insertReport, viewReport,
-    getBetInvestors
+    getBetInvestors,
+    getBetInvestorsChain,
 } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = 'EVNT';
@@ -34,6 +35,7 @@ class Bet {
         this.outcomes = outcomes || 2;
         this.collateralToken = new ERC20(COLLATERAL_TOKEN);
         this.ONE = this.collateralToken.ONE;
+        this.AMM_INTERACTION_TYPE = DIRECTION
     }
 
     /**
@@ -88,6 +90,14 @@ class Bet {
      * @returns {Promise<*>}
      */
     getInvestorsOfOutcome = async (outcome) => await viewAllBalancesOfToken(this.getOutcomeKey(outcome));
+
+
+    /**
+     * Get all Investors of a Bet, broken by interaction type
+     *
+     * @returns {Promise<*>}
+     */
+    getUserAmmInteractions = async () => await getBetInvestors(this.betId);
 
     /**
      * Get the OutcomeToken-Balances of a user
@@ -581,7 +591,7 @@ class Bet {
 
         try {
             await insertReportChain(dbClient, this.betId, "Refund", OUTCOME_BET_REFUNDED, new Date());
-            const ammInteractions = await getBetInvestors(dbClient, this.betId);
+            const ammInteractions = await getBetInvestorsChain(dbClient, this.betId);
             const beneficiaries = {};
             const notEligible = [];
 
