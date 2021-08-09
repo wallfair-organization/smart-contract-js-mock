@@ -1,18 +1,28 @@
 {
   "name": "@wallfair.io/smart_contract_mock",
+  "author": "Wallfair",
   "version": "0.0.20",
-  "description": "",
+  "description": "Wallfair Smart Contract Contract Mock in JS.",
+  "license": "AGPL-3.0-only",
+
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wallfair-organization/smart-contract-js-mock.git"
+  },
+
   "main": "index.js",
+
   "scripts": {
     "start": "node index.js",
     "test": "jest -i"
   },
-  "keywords": [],
-  "author": "Wallfair",
-  "license": "AGPL-3.0-only",
+
+  "keywords": ["wallfair", "smart-contracts", "erc20", "javascript", "mock", "ethereum"],
+
   "dependencies": {
     "pg": "^8.6.0"
   },
+
   "devDependencies": {
     "jest": "^27.0.4"
   }
