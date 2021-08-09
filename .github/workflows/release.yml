@@ -1,4 +1,4 @@
-name: Wallfair. Smart Contract Mock Test
+name: On Release Plublish NPM package
 
 on:
   release:
