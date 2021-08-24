@@ -12,6 +12,8 @@ A collection of JavaScript classes to emulate the mechanics of the Smart Contrac
 | POSTGRES_DISABLE_SSL |               | true          |
 | POSTGRES_CA          |               | ~/ca.crt      |
 
+For convenience, a `.env.example` is provided. This file can be renamed to `.env` and adjusted. 
+
 ## Disclaimer
 This code is intended to be used only for the MVP launch, and will eventually be replaced by actual Smart Contracts.
 
