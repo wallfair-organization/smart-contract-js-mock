@@ -57,14 +57,17 @@ class CasinoTrade {
             await setCasinoTradeOutcomes(dbClient, gameId, decidedCrashFactor);
             let winners = await getCasinoTrades(dbClient, gameId, CASINO_TRADE_STATE.WIN);
             for (let winner of winners) {
-                let reward = bigDecimal.multiply(BigInt(winner.stakedamount), decidedCrashFactor);
+                let reward = bigDecimal.multiply(BigInt(winner.stakedamount), parseFloat(winner.crashfactor));
                 reward = BigInt(bigDecimal.round(reward));
+                winner.reward = reward;
 
                 await this.EVNTToken.transferChain(dbClient, this.casinoWalletAddr, winner.userid, reward);
             }
 
             await commitDBTransaction(dbClient);
+            return winners;
         } catch (e) {
+            console.log(e);
             await rollbackDBTransaction(dbClient);
             throw e;
         }
