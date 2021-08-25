@@ -263,20 +263,26 @@ test('Test Refund Bet', async () => {
     expect(await EVNT.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
 });
 
-test('Get AMM Interactions', async () => {
-    const testBetId = 'getAmmInteractionsBet';
-    const investorWalletId1 = 'wallet1';
+async function prepareAMMInteractions(betId, wallet) {
+    await EVNT.mint(wallet, investAmount * 2n);
 
-    await EVNT.mint(investorWalletId1, investAmount);
-
-    const bet = new Bet(testBetId, 2);
+    const bet = new Bet(betId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
-    await bet.buy(investorWalletId1, investAmount, 0, 1n);
-    await bet.sell(investorWalletId1, investAmount / 2n, 0, investAmount);
+    await bet.buy(wallet, investAmount, 0, 1n);
+    await bet.buy(wallet, investAmount / 2n, 1, 1n);
+    await bet.sell(wallet, investAmount / 2n, 0, investAmount);
 
     await bet.resolveBet('testPayout', 0);
-    await bet.getPayout(investorWalletId1);
+    await bet.getPayout(wallet);
+
+    return bet;
+} 
+
+test('Get User AMM Aggregated Interactions', async () => {
+    const testBetId = 'getAmmInteractionsBet';
+    const investorWalletId1 = 'wallet1';
+    const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
 
     const ammInteractions = await bet.getUserAmmInteractions();
     expect(ammInteractions.length).toEqual(3);
@@ -288,9 +294,30 @@ test('Get AMM Interactions', async () => {
     )
     
     // we expect to have BUY, SELL & PAYOUT interaction
-    expectInteraction({ buyer: 'wallet1', direction: 'BUY'});
-    expectInteraction({ buyer: 'wallet1', direction: 'SELL'});
-    expectInteraction({ buyer: 'wallet1', direction: 'PAYOUT'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'BUY'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'SELL'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'PAYOUT'});
+});
+
+test('Get All AMM Interactions', async () => {
+    const testBetId = 'getBetInteractions';
+    const investorWalletId1 = 'wallet1';
+    const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
+
+    const ammInteractions = await bet.getBetInteractions();
+    expect(ammInteractions.length).toEqual(4);
+
+    expectInteraction = (f) => expect(ammInteractions).toEqual(
+        expect.arrayContaining([
+            expect.objectContaining(f)
+        ])
+    )
+    
+    // we expect to have BUY, SELL & PAYOUT interaction
+    expectInteraction({ buyer: investorWalletId1, direction: 'BUY', outcome: 0, investmentamount: '100000'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'BUY', outcome: 1, investmentamount: '50000'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'SELL'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'PAYOUT'});
 });
 
 test('Test Weird Jonas Case', async () => {
