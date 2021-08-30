@@ -15,7 +15,7 @@ const {
     getBetInvestorsChain,
 } = require('../utils/db_helper');
 
-const COLLATERAL_TOKEN = 'EVNT';
+const COLLATERAL_TOKEN = 'WFAIR';
 const WALLET_PREFIX = 'BET_';
 const FEE_WALLET_PREFIX = 'FEE_';
 const OUTCOME_BET_REFUNDED = -1;
@@ -309,7 +309,7 @@ class Bet {
     }
 
     /**
-     * Calculate the amount of EVNT-tokens returned for the requested sell amount
+     * Calculate the amount of WFAIR-tokens returned for the requested sell amount
      *
      * @param sellAmount {bigint}
      * @param outcome {number}
@@ -321,7 +321,7 @@ class Bet {
     }
 
     /**
-     * Calculate the amount of EVNT-tokens returned for the requested sell amount
+     * Calculate the amount of WFAIR-tokens returned for the requested sell amount
      *
      * @param dbClient {Client}
      * @param sellAmount {bigint}

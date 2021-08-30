@@ -13,13 +13,13 @@ const {
     getCasinoTrades
 } = require('../utils/db_helper');
 
-const EVNT_TOKEN = 'EVNT';
+const WFAIR_TOKEN = 'WFAIR';
 
 class CasinoTrade {
     constructor(casinoWalletAddr) {
         this.casinoWalletAddr = casinoWalletAddr;
         this.CASINO_TRADE_STATE = CASINO_TRADE_STATE;
-        this.EVNTToken = new ERC20(EVNT_TOKEN);
+        this.WFAIRToken = new ERC20(WFAIR_TOKEN);
     }
 
     placeTrade = async (userWalletAddr, stakedAmount, crashFactor) => {
@@ -27,7 +27,7 @@ class CasinoTrade {
 
         try {
             // in the same transaction, transfer the funds, and create the casino trade
-            await this.EVNTToken.transferChain(dbClient, userWalletAddr, this.casinoWalletAddr, stakedAmount);
+            await this.WFAIRToken.transferChain(dbClient, userWalletAddr, this.casinoWalletAddr, stakedAmount);
             await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount);
 
             await commitDBTransaction(dbClient);
@@ -61,7 +61,7 @@ class CasinoTrade {
                 reward = BigInt(bigDecimal.round(reward));
                 winner.reward = reward;
 
-                await this.EVNTToken.transferChain(dbClient, this.casinoWalletAddr, winner.userid, reward);
+                await this.WFAIRToken.transferChain(dbClient, this.casinoWalletAddr, winner.userid, reward);
             }
 
             await commitDBTransaction(dbClient);
