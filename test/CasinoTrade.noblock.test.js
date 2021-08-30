@@ -5,9 +5,9 @@ const ERC20 = require('../erc20_moc/Erc20.noblock');
 const Casino = require('../erc20_moc/CasinoTrade.noblock');
 const { TestWatcher } = require('@jest/core');
 
-const EVNT = new ERC20('EVNT');
+const WFAIR = new ERC20('WFAIR');
 const casinoWallet = 'CASINO';
-const liquidityAmount = 1000000n * EVNT.ONE;
+const liquidityAmount = 1000000n * WFAIR.ONE;
 
 jest.setTimeout(1000000);
 
@@ -20,7 +20,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-    await EVNT.mint(casinoWallet, liquidityAmount);
+    await WFAIR.mint(casinoWallet, liquidityAmount);
 });
 
 /**
@@ -29,13 +29,13 @@ beforeEach(async () => {
 test('Run a game', async () => {
     const casino = new Casino(casinoWallet);
 
-    // mint players with 5000 EVNT balance
-    await EVNT.mint("player1", 5000n * EVNT.ONE);
-    await EVNT.mint("player2", 5000n * EVNT.ONE);
+    // mint players with 5000 WFAIR balance
+    await WFAIR.mint("player1", 5000n * WFAIR.ONE);
+    await WFAIR.mint("player2", 5000n * WFAIR.ONE);
 
     // eahc player places a trade
-    await casino.placeTrade("player1", 2000n * EVNT.ONE, 15.50); // this trade will lose
-    await casino.placeTrade("player2", 2000n * EVNT.ONE, 2.10); // this trade will win 4200 EVNT
+    await casino.placeTrade("player1", 2000n * WFAIR.ONE, 15.50); // this trade will lose
+    await casino.placeTrade("player2", 2000n * WFAIR.ONE, 2.10); // this trade will win 4200 WFAIR
 
     // lock the trades
     await casino.lockOpenTrades("gameId");
@@ -46,5 +46,5 @@ test('Run a game', async () => {
     // run tests
     expect(winners.length).toBe(1); // there should be only one winner
     expect(winners[0].userid).toBe("player2"); // that player should be player2
-    expect(winners[0].reward).toBe(4200n * EVNT.ONE); // and the reward should be 4200 EVNT
+    expect(winners[0].reward).toBe(4200n * WFAIR.ONE); // and the reward should be 4200 WFAIR
 });

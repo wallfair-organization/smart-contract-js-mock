@@ -15,11 +15,11 @@ test('Mint Tokens', async () => {
     const tokensToMint = 1000n;
     const testMintWallet = 'testMint';
 
-    const EVNT = new ERC20('EVNT');
+    const WFAIR = new ERC20('WFAIR');
 
-    await EVNT.mint(testMintWallet, tokensToMint);
+    await WFAIR.mint(testMintWallet, tokensToMint);
 
-    expect(await EVNT.balanceOf(testMintWallet)).toBe(tokensToMint);
+    expect(await WFAIR.balanceOf(testMintWallet)).toBe(tokensToMint);
 });
 
 test('Transfer Tokens', async () => {
@@ -28,13 +28,13 @@ test('Transfer Tokens', async () => {
     const testSenderWallet = 'testSender';
     const testReceiverWallet = 'testReceiver';
 
-    const EVNT = new ERC20('EVNT');
+    const WFAIR = new ERC20('WFAIR');
 
-    await EVNT.mint(testSenderWallet, tokensToMint);
-    await EVNT.transfer(testSenderWallet, testReceiverWallet, tokensToTransfer);
+    await WFAIR.mint(testSenderWallet, tokensToMint);
+    await WFAIR.transfer(testSenderWallet, testReceiverWallet, tokensToTransfer);
 
-    expect(await EVNT.balanceOf(testSenderWallet)).toBe(tokensToMint - tokensToTransfer);
-    expect(await EVNT.balanceOf(testReceiverWallet)).toBe(tokensToTransfer);
+    expect(await WFAIR.balanceOf(testSenderWallet)).toBe(tokensToMint - tokensToTransfer);
+    expect(await WFAIR.balanceOf(testReceiverWallet)).toBe(tokensToTransfer);
 });
 
 test('Burn Tokens', async () => {
@@ -42,10 +42,10 @@ test('Burn Tokens', async () => {
     const tokensToBurn = 100n;
     const testBurnWallet = 'testBurn';
 
-    const EVNT = new ERC20('EVNT');
+    const WFAIR = new ERC20('WFAIR');
 
-    await EVNT.mint(testBurnWallet, tokensToMint);
-    await EVNT.burn(testBurnWallet, tokensToBurn);
+    await WFAIR.mint(testBurnWallet, tokensToMint);
+    await WFAIR.burn(testBurnWallet, tokensToBurn);
 
-    expect(await EVNT.balanceOf(testBurnWallet)).toBe(tokensToMint - tokensToBurn);
+    expect(await WFAIR.balanceOf(testBurnWallet)).toBe(tokensToMint - tokensToBurn);
 });

@@ -11,7 +11,7 @@ class Leaderboard {
     }
 
     /**
-     * Get a limited list of the leaders ordered by their EVNT Balance
+     * Get a limited list of the leaders ordered by their WFAIR Balance
      *
      * @param limit {number}
      * @returns {Promise<*>}

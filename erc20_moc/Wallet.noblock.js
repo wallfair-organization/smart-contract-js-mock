@@ -21,7 +21,7 @@ class Wallet {
 
     balanceOf = async (symbol) => await new ERC20(symbol).balanceOf(this.walletId);
 
-    balanceOfEVNT = async () => await this.balanceOf('EVNT');
+    balanceOfWFAIR = async () => await this.balanceOf('WFAIR');
 
     getAMMInteractions = async () => await viewAMMInteractionsOfUser(this.walletId);
 
