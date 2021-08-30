@@ -56,7 +56,7 @@ const GET_TRANSACTIONS_OF_USER = 'SELECT * FROM token_transactions WHERE (sender
 const GET_TRANSACTIONS_OF_USER_AND_TOKEN = 'SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2);';
 
 const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
-const GET_BET_INTERACTIONS = 'SELECT * FROM amm_interactions WHERE bet = $1;';
+const GET_BET_INTERACTIONS = 'SELECT * FROM amm_interactions WHERE bet = $1 AND trx_timestamp >= $2 AND direction = $3;';
 const GET_USER_INVESTMENT = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount, SUM(feeamount) AS fee FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction;';
 const GET_BET_INVESTORS = 'SELECT buyer, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, direction;';
 
@@ -394,8 +394,8 @@ async function viewUserInvestment(user, bet, outcome) {
  * @param bet {String}
  * @returns {Promise<*>}
  */
- async function getBetInteractions(bet) {
-    const res = await pool.query(GET_BET_INTERACTIONS, [bet]);
+ async function getBetInteractions(bet, startDate, direction) {
+    const res = await pool.query(GET_BET_INTERACTIONS, [bet, startDate, direction]);
     return res.rows;
 }
 

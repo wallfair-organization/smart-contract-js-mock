@@ -105,7 +105,7 @@ class Bet {
      *
      * @returns {Promise<*>}
      */
-     getBetInteractions = async () => await getBetInteractions(this.betId);
+     getBetInteractions = async (startDate, direction) => await getBetInteractions(this.betId, startDate, direction);
 
     /**
      * Get the OutcomeToken-Balances of a user
