@@ -387,11 +387,13 @@ async function viewUserInvestment(user, bet, outcome) {
 }
 
 /**
- * Get all interactions between users and particular bet (buy/sell/refund/payput operations)
- * No aggregates - a raw list is returned
+ * Get interactions between users and particular bet 
+ * For buy/sell/refund/payput operation directions and from specific startDate
  *
  * @param client {Client}
  * @param bet {String}
+ * @param startDate {Date}
+ * @param direction {String}
  * @returns {Promise<*>}
  */
  async function getBetInteractions(bet, startDate, direction) {

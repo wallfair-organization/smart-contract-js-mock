@@ -299,13 +299,15 @@ test('Get User AMM Aggregated Interactions', async () => {
     expectInteraction({ buyer: investorWalletId1, direction: 'PAYOUT'});
 });
 
-test('Get All AMM Interactions', async () => {
+test('Get AMM Interactions for specific direction and with start date', async () => {
     const testBetId = 'getBetInteractions';
     const investorWalletId1 = 'wallet1';
+    const direction = 'BUY';
+    const startDate = new Date();
     const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
 
-    const ammInteractions = await bet.getBetInteractions();
-    expect(ammInteractions.length).toEqual(4);
+    const ammInteractions = await bet.getBetInteractions(startDate, direction);
+    expect(ammInteractions.length).toEqual(2);
 
     expectInteraction = (f) => expect(ammInteractions).toEqual(
         expect.arrayContaining([
@@ -313,11 +315,9 @@ test('Get All AMM Interactions', async () => {
         ])
     )
     
-    // we expect to have BUY, SELL & PAYOUT interaction
+    // we expect to receive BUY interactions only
     expectInteraction({ buyer: investorWalletId1, direction: 'BUY', outcome: 0, investmentamount: '100000'});
     expectInteraction({ buyer: investorWalletId1, direction: 'BUY', outcome: 1, investmentamount: '50000'});
-    expectInteraction({ buyer: investorWalletId1, direction: 'SELL'});
-    expectInteraction({ buyer: investorWalletId1, direction: 'PAYOUT'});
 });
 
 test('Test Weird Jonas Case', async () => {
