@@ -101,11 +101,11 @@ class Bet {
     getUserAmmInteractions = async () => await getBetInvestors(this.betId);
 
     /**
-     * Get all Investors of a Bet, broken by interaction type
+     * Get all Interactions of a Bet, broken by interaction type
      *
      * @returns {Promise<*>}
      */
-     getBetInteractions = async () => await getBetInteractions(this.betId);
+     getBetInteractions = async (startDate, direction) => await getBetInteractions(this.betId, startDate, direction);
 
     /**
      * Get the OutcomeToken-Balances of a user

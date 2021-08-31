@@ -320,6 +320,27 @@ test('Get All AMM Interactions', async () => {
     expectInteraction({ buyer: investorWalletId1, direction: 'PAYOUT'});
 });
 
+test('Get AMM Interactions for specific direction and with start date', async () => {
+    const testBetId = 'getBetInteractionsSpecificDirection';
+    const investorWalletId1 = 'wallet1';
+    const direction = 'BUY';
+    const startDate = new Date('2021-01-01');
+    const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
+
+    const ammInteractions = await bet.getBetInteractions(startDate, direction);
+    expect(ammInteractions.length).toEqual(2);
+
+    expectInteraction = (f) => expect(ammInteractions).toEqual(
+        expect.arrayContaining([
+            expect.objectContaining(f)
+        ])
+    )
+    
+    // we expect to receive BUY interactions only
+    expectInteraction({ buyer: investorWalletId1, direction: 'BUY', outcome: 0, investmentamount: '100000'});
+    expectInteraction({ buyer: investorWalletId1, direction: 'BUY', outcome: 1, investmentamount: '50000'});
+});
+
 test('Test Weird Jonas Case', async () => {
     const testBetId = 'JonasBet';
 

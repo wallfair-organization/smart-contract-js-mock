@@ -56,7 +56,7 @@ const GET_TRANSACTIONS_OF_USER = 'SELECT * FROM token_transactions WHERE (sender
 const GET_TRANSACTIONS_OF_USER_AND_TOKEN = 'SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2);';
 
 const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
-const GET_BET_INTERACTIONS = 'SELECT * FROM amm_interactions WHERE bet = $1;';
+const GET_BET_INTERACTIONS = 'SELECT * FROM amm_interactions WHERE bet = $1';
 const GET_USER_INVESTMENT = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount, SUM(feeamount) AS fee FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction;';
 const GET_BET_INVESTORS = 'SELECT buyer, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, direction;';
 
@@ -387,15 +387,30 @@ async function viewUserInvestment(user, bet, outcome) {
 }
 
 /**
- * Get all interactions between users and particular bet (buy/sell/refund/payput operations)
- * No aggregates - a raw list is returned
+ * Get interactions between users and particular bet 
+ * For buy/sell/refund/payput operation directions or from specific startDate
  *
  * @param client {Client}
  * @param bet {String}
+ * @param startDate {Date}
+ * @param direction {String}
  * @returns {Promise<*>}
  */
- async function getBetInteractions(bet) {
-    const res = await pool.query(GET_BET_INTERACTIONS, [bet]);
+ async function getBetInteractions(bet, startDate, direction) {
+    let values = [bet];
+    let query = GET_BET_INTERACTIONS;
+
+    if(startDate) {
+        query += ' AND trx_timestamp >= $2';
+        values.push(startDate);
+    }
+
+    if(direction) {
+        query += ` AND direction = $${startDate ? 3 : 2}`
+        values.push(direction);
+    }
+
+    const res = await pool.query(`${query};`, values);
     return res.rows;
 }
 
