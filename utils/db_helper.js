@@ -57,6 +57,7 @@ const GET_TRANSACTIONS_OF_USER_AND_TOKEN = 'SELECT * FROM token_transactions WHE
 
 const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
 const GET_BET_INTERACTIONS = 'SELECT * FROM amm_interactions WHERE bet = $1';
+const GET_BET_INTERACTIONS_SUMMARY = 'SELECT outcome, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 AND direction = $2 AND trx_timestamp <= $3 GROUP BY outcome;'
 const GET_USER_INVESTMENT = 'SELECT buyer, bet, direction, SUM(investmentamount) AS amount, SUM(feeamount) AS fee FROM amm_interactions WHERE buyer = $1 AND bet = $2 AND outcome = $3 GROUP BY buyer, bet, direction;';
 const GET_BET_INVESTORS = 'SELECT buyer, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, direction;';
 
@@ -415,6 +416,21 @@ async function viewUserInvestment(user, bet, outcome) {
 }
 
 /**
+ * Get interactions summary between users and particular bet 
+ * For buy/sell/refund/payput operation directions and specific endDate
+ *
+ * @param client {Client}
+ * @param bet {String}
+ * @param direction {String}
+ * @param endDate {Date}
+ * @returns {Promise<*>}
+ */
+async function getBetInteractionsSummary(bet, direction, endDate) {
+    const res = await pool.query(GET_BET_INTERACTIONS_SUMMARY, [bet, direction, endDate]);
+    return res.rows;
+}
+
+/**
  * Get all buyers and sellers for particular bet with aggregated buy/sell amounts
  *
  * @param client {Client}
@@ -508,6 +524,7 @@ module.exports = {
     getBetInvestorsChain,
     getBetInvestors,
     getBetInteractions,
+    getBetInteractionsSummary,
     insertCasinoTrade,
     lockOpenCasinoTrades,
     setCasinoTradeOutcomes,

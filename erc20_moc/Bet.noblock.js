@@ -12,6 +12,7 @@ const {
     insertReport, viewReport,
     getBetInvestors,
     getBetInteractions,
+    getBetInteractionsSummary,
     getBetInvestorsChain,
 } = require('../utils/db_helper');
 
@@ -106,6 +107,13 @@ class Bet {
      * @returns {Promise<*>}
      */
      getBetInteractions = async (startDate, direction) => await getBetInteractions(this.betId, startDate, direction);
+
+    /**
+     * Get Interactions Summary of a Bet until specific date, broken by direction type
+     *
+     * @returns {Promise<*>}
+     */
+     getBetInteractionsSummary = async(direction, endDate) => await getBetInteractionsSummary(this.betId, direction, endDate);
 
     /**
      * Get the OutcomeToken-Balances of a user
