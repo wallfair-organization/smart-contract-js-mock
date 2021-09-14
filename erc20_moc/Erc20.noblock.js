@@ -81,7 +81,7 @@ class ERC20 {
                 await updateBalanceOfUser(dbClient, receiver, this.symbol, trx_time, receiverBalance + amount);
                 await insertTransaction(dbClient, sender, receiver, amount, this.symbol, trx_time);
             } else {
-                throw new NoWeb3Exception(sender + " can't spend more than it owns!");
+                throw new NoWeb3Exception(`Sender can't spend more than it owns! Sender: ${sender} -- Receiver: ${receiver} -- senderBalance: ${senderBalance} -- amount: ${amount}`);
             }
         } else {
             throw new NoWeb3Exception("Spending negative amounts is not possible!");

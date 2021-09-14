@@ -90,6 +90,25 @@ test('Buy Outcome Tokens', async () => {
     expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBeGreaterThan(expectedOutcomeTokens - 10n);
 });
 
+test('Buy Outcome Tokens - custom amounts', async () => {
+    const testBetId = 'buyOutcomeTokensCustomAmount';
+    const investorWalletId = 'buyOutcomeTokensCustomAmountInvestor';
+    const investorMintAmount = 1336568n * WFAIR.ONE;
+    const liquidityAmount    = 214748n * WFAIR.ONE;
+    const customInvestAmount = 299999n * WFAIR.ONE;
+
+    await WFAIR.mint(investorWalletId, investorMintAmount);
+    await WFAIR.mint(liquidityProviderWallet, liquidityAmount);
+
+    const bet = new Bet(testBetId, 2);
+    await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+    const expectedOutcomeTokens = await bet.calcBuy(customInvestAmount, 0);
+    await bet.buy(investorWalletId, customInvestAmount, 0, 10000n);
+
+    expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBeGreaterThan(expectedOutcomeTokens - 1000n);
+});
+
 test('Buy and Sell Outcome Tokens', async () => {
     const testBetId = 'buyAndSellOutcomeTokens';
     const investorWalletId = 'buyAndSellOutcomeTokensInvestor';
