@@ -179,6 +179,7 @@ class Bet {
      * @returns {Promise<void>}
      */
     addLiquidity = async (provider, amount) => {
+        // TODO: this works only when market is empty and for 50:50 initial outcome probs, reimplement
         const dbClient = await createDBTransaction();
         try {
             await this.collateralToken.transferChain(dbClient, provider, this.walletId, amount);
@@ -189,7 +190,6 @@ class Bet {
 
             await commitDBTransaction(dbClient);
         } catch (e) {
-            console.error(e);
             await rollbackDBTransaction(dbClient);
             throw e;
         }
@@ -223,7 +223,8 @@ class Bet {
 
         const investmentAmountMinusFees = investmentAmount - this._getFee(investmentAmount);
         const buyTokenPoolBalance = poolBalances[outcomeKey];
-        let endingOutcomeBalance = buyTokenPoolBalance;
+        // endingOutcomeBalance below we do a set multiplicalions on this value which are scaled this.ONE^2
+        let endingOutcomeBalance = buyTokenPoolBalance * this.ONE;
 
         for (let i = 0; i < Object.keys(poolBalances).length; i++) {
             const poolBalanceKey = Object.keys(poolBalances)[i];
@@ -232,8 +233,12 @@ class Bet {
                 endingOutcomeBalance = (endingOutcomeBalance * poolBalance) / (poolBalance + investmentAmountMinusFees);
             }
         }
+        const outcomeTokensAmount = buyTokenPoolBalance + investmentAmountMinusFees - (endingOutcomeBalance / this.ONE);
+        if (outcomeTokensAmount < 0) {
+            throw new NoWeb3Exception(`Assert when buying: outcome token amount was negative: amount: ${investmentAmount} outcome: ${outcomeKey}`);
+        }
 
-        return buyTokenPoolBalance + investmentAmountMinusFees - endingOutcomeBalance;
+        return outcomeTokensAmount;
     }
 
     /**
@@ -275,20 +280,24 @@ class Bet {
         if (outcome < 0 || outcome > this.outcomes) {
             throw new NoWeb3Exception("The outcome needs to be int the range between 0 and " + this.outcomes + ", but is \"" + outcome + "\"");
         }
-
         const returnAmountPlusFees = returnAmount + this._getFee(returnAmount);
         const sellTokenPoolBalance = poolBalances[outcomeKey];
-        let endingOutcomeBalance = sellTokenPoolBalance;
+        // endingOutcomeBalance below we do a set multiplicalions on this value which are scaled this.ONE^2
+        let endingOutcomeBalance = sellTokenPoolBalance * this.ONE;
 
         for (let i = 0; i < Object.keys(poolBalances).length; i++) {
             const poolBalanceKey = Object.keys(poolBalances)[i];
             if (poolBalanceKey !== outcomeKey) {
                 const poolBalance = poolBalances[poolBalanceKey];
+                // make sure we can actually compensate with other outcomes
+                if (poolBalance <= returnAmountPlusFees) {
+                    throw new NoWeb3Exception(`You cannot sell ${returnAmountPlusFees} (with fees) which is more than ${poolBalance} in outcome ${poolBalanceKey}`)
+                }
                 endingOutcomeBalance = (endingOutcomeBalance * poolBalance) / (poolBalance - returnAmountPlusFees);
             }
         }
 
-        return returnAmountPlusFees + endingOutcomeBalance - sellTokenPoolBalance;
+        return returnAmountPlusFees + (endingOutcomeBalance / this.ONE) - sellTokenPoolBalance;
     }
 
     /**
@@ -402,7 +411,8 @@ class Bet {
         try {
             const outcomeTokensToBuy = await this.calcBuyChain(dbClient, investmentAmount, outcome);
             const feeAmount = this._getFee(investmentAmount);
-            const outcomeToken = this.getOutcomeTokens()[outcome];
+            const tokens = this.getOutcomeTokens();
+            const outcomeToken = tokens[outcome];
 
             if (outcomeTokensToBuy < minOutcomeTokensToBuy) {
                 throw new NoWeb3Exception("Minimum buy amount not reached");
@@ -410,6 +420,13 @@ class Bet {
 
             await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
+
+            // mint new outcome tokens that correspond to increased collateral value
+            for (const token of tokens) {
+                await token.mintChain(dbClient, this.walletId, investmentAmount - feeAmount);
+            }
+
+            // send out the outcome tokens to the buyer
             await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
 
             await insertAMMInteraction(dbClient, buyer, this.betId, outcome, DIRECTION.BUY, investmentAmount, feeAmount, outcomeTokensToBuy, new Date());
@@ -447,15 +464,21 @@ class Bet {
 
             const outcomeTokensToSell = await this.calcSellChain(dbClient, returnAmount, outcome);
             const feeAmount = this._getFee(returnAmount);
-            const outcomeToken = this.getOutcomeTokens()[outcome];
+            const tokens = this.getOutcomeTokens();
+            const outcomeToken = tokens[outcome];
 
             if (outcomeTokensToSell > maxOutcomeTokensToSell) {
                 throw new NoWeb3Exception("Maximum sell amount surpassed");
             }
-
             await outcomeToken.transferChain(dbClient, seller, this.walletId, outcomeTokensToSell);
+
             await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
             await this.collateralToken.transferChain(dbClient, this.walletId, this.feeWalletId, feeAmount);
+
+            // burn the outcome token corresponding to decreased collateral value
+            for (const token of tokens) {
+                await token.burnChain(dbClient, this.walletId, returnAmount + feeAmount);
+            }
 
             await insertAMMInteraction(dbClient, seller, this.betId, outcome, DIRECTION.SELL, returnAmount, feeAmount, outcomeTokensToSell, new Date());
 
