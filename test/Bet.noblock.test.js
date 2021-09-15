@@ -68,10 +68,11 @@ test('Check AMM Sell from Amount', async () => {
     const bet = new Bet(testBetId, 2);
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
-    const result = await bet.calcSell(5n * WFAIR.ONE, 0);
+    const result = await bet.calcSell(34n * WFAIR.ONE, 0);
     const result2 = await bet.calcSell(3n * WFAIR.ONE, 0);
 
-    expect(await bet.calcSellFromAmount(result, 0)).toBe(5n * WFAIR.ONE);
+    // do the reverse operations. and see if we get same value, be aware that exact reverse may be impossible
+    expect(await bet.calcSellFromAmount(result, 0)).toBe(34n * WFAIR.ONE);
     expect(await bet.calcSellFromAmount(result2, 0)).toBe(3n * WFAIR.ONE);
 });
 
@@ -104,6 +105,7 @@ test('Buy Outcome Tokens - custom amounts', async () => {
     await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
     const expectedOutcomeTokens = await bet.calcBuy(customInvestAmount, 0);
+
     await bet.buy(investorWalletId, customInvestAmount, 0, 10000n);
 
     expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId)).toBeGreaterThan(expectedOutcomeTokens - 1000n);

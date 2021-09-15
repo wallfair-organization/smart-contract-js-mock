@@ -11,7 +11,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "jest -i"
+    "test": "node --trace-warnings node_modules/.bin/jest -i"
   },
   "keywords": [
     "wallfair",
