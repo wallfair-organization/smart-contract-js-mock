@@ -1,4 +1,4 @@
-const { Pool, Client } = require('pg');
+const { Pool } = require('pg');
 const fs = require('fs');
 
 const pool = new Pool({
@@ -99,6 +99,15 @@ const GET_CASINO_TRADES =
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *';
 
+
+const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
+  select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
+  outcomeindex,
+  avg(quote) as quote
+from amm_price_action
+where trx_timestamp > localtimestamp - interval '${interval2}' and betid = $3
+group by outcomeindex, trunc
+order by outcomeindex, trunc;`
 
 /**
  * @returns {Promise<Client>}
@@ -600,6 +609,29 @@ async function viewReport(bet_id) {
   return res.rows;
 }
 
+function getTimeParams(timePeriod, betId) {
+  switch (timePeriod) {
+    case '7days':
+      return ['4 hours', '7 days', 'hour', 'day', 4, betId];
+    case '30days':
+      return ['8 hours', '30 days', 'hour', 'day', 8, betId];
+    case '24hours':
+    default:
+      return ['30 minutes', '1 day', 'minute', 'hour', 30, betId];
+  }
+}
+
+async function getAmmPriceActions(betId, timeOption) {
+  const params = getTimeParams(timeOption, betId);
+  const query = GET_AMM_PRICE_ACTIONS(params[0], params[1], params[2]);
+  const res = await pool.query(query, params.slice(3));
+  return res.rows.map(r => ({
+    outcomeIndex: r.outcomeindex,
+    trxTimestamp: r.trunc,
+    quote: Number(r.quote),
+  }));
+}
+
 module.exports = {
   pool,
   DIRECTION,
@@ -637,4 +669,5 @@ module.exports = {
   setCasinoTradeOutcomes,
   getCasinoTrades,
   attemptCashout,
+  getAmmPriceActions,
 };
