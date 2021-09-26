@@ -85,6 +85,7 @@ class CasinoTrade {
         stakedAmount += BigInt(stakedamount);
       }
 
+      
       if (totalReward > 0n) {
         await this.WFAIRToken.transferChain(
           dbClient,
@@ -93,6 +94,7 @@ class CasinoTrade {
           totalReward
         );
         await commitDBTransaction(dbClient);
+
         return { totalReward, stakedAmount };
       } else {
         await rollbackDBTransaction(dbClient);
@@ -108,12 +110,13 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      await setCasinoTradeOutcomes(dbClient, gameId, decidedCrashFactor);
-      let winners = await getCasinoTrades(
+      let result = await setCasinoTradeOutcomes(dbClient, gameId, decidedCrashFactor);
+      let winners = result.rows;
+      /*let winners = await getCasinoTrades(
         dbClient,
         gameId,
         CASINO_TRADE_STATE.WIN
-      );
+      );*/
       for (let winner of winners) {
         let reward = bigDecimal.multiply(
           BigInt(winner.stakedamount),

@@ -93,11 +93,11 @@ const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state) VALUES ($1, $2, $3, $4);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameId = $2 WHERE state = ${CASINO_TRADE_STATE.OPEN};`;
 const SET_CASINO_TRADE_OUTCOMES =
-  'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameId = $1 AND state = 1;';
+  'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameId = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount;';
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
-  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *';
+  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *;';
 
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
@@ -376,7 +376,7 @@ async function lockOpenCasinoTrades(client, gameId) {
  * @param {Number} crashFactor
  */
 async function setCasinoTradeOutcomes(client, gameId, crashFactor) {
-  await client.query(SET_CASINO_TRADE_OUTCOMES, [gameId, crashFactor]);
+  return await client.query(SET_CASINO_TRADE_OUTCOMES, [gameId, crashFactor]);
 }
 
 /**
