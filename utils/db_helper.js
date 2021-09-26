@@ -601,6 +601,7 @@ async function viewReport(bet_id) {
 }
 
 module.exports = {
+  pool,
   DIRECTION,
   CASINO_TRADE_STATE,
   setupDatabase,
