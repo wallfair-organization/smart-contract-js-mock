@@ -10,6 +10,7 @@ const {
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
   getCasinoTrades,
+  attemptCashout,
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -53,6 +54,47 @@ class CasinoTrade {
       await lockOpenCasinoTrades(dbClient, gameId);
 
       await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+  cashout = async (userWalletAddr, crashFactor, gameId) => {
+    const dbClient = await createDBTransaction();
+
+    try {
+      let res = await attemptCashout(dbClient, userwalletAddr, gameId, crashFactor);
+
+      if (res.rows.length == 0) {
+        throw "Transaction did not succeed";
+      }
+
+      let totalReward = 0;
+
+      for (let row of res.rows) {
+        let { stakedamount } = row;
+        let reward = bigDecimal.multiply(
+          BigInt(stakedamount),
+          parseFloat(crashFactor)
+        );
+        reward = BigInt(bigDecimal.round(reward));
+        totalReward += reward;
+      }
+
+      if (totalReward > 0) {
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          this.casinoWalletAddr,
+          userWalletAddr,
+          totalReward
+        );
+        await commitDBTransaction(dbClient);
+        return totalReward;
+      } else {
+        await rollbackDBTransaction(dbClient);
+      }
+
     } catch (e) {
       await rollbackDBTransaction(dbClient);
       throw e;

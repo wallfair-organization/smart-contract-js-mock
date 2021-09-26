@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { Pool, Client } = require('pg');
 const fs = require('fs');
 
 const pool = new Pool({
@@ -96,6 +96,9 @@ const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameId = $1 AND state = 1;';
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
+const SET_CASINO_TRADE_STATE =
+  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *';
+
 
 /**
  * @returns {Promise<Client>}
@@ -329,6 +332,18 @@ async function insertCasinoTrade(
     stakedAmount,
     CASINO_TRADE_STATE.OPEN,
   ]);
+}
+
+/**
+ * Attempts to cashout user from a casino trade
+ * 
+ * @param {Client} client 
+ * @param {String} userwalletAddr 
+ * @param {String} gameId 
+ * @returns 
+ */
+async function attemptCashout(client, userwalletAddr, gameId, crashFactor) {
+  return await client.query(SET_CASINO_TRADE_STATE, [CASINO_TRADE_STATE.WIN, crashFactor, gameId, CASINO_TRADE_STATE.LOCKED, userwalletAddr]);
 }
 
 /**
@@ -620,4 +635,5 @@ module.exports = {
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
   getCasinoTrades,
+  attemptCashout,
 };
