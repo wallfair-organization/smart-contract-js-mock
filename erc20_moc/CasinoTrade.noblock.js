@@ -64,13 +64,14 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      let res = await attemptCashout(dbClient, userwalletAddr, gameId, crashFactor);
+      let res = await attemptCashout(dbClient, userWalletAddr, gameId, crashFactor);
 
       if (res.rows.length == 0) {
         throw "Transaction did not succeed";
       }
 
-      let totalReward = 0;
+      let totalReward = 0n;
+      let stakedAmount = 0n;
 
       for (let row of res.rows) {
         let { stakedamount } = row;
@@ -80,9 +81,11 @@ class CasinoTrade {
         );
         reward = BigInt(bigDecimal.round(reward));
         totalReward += reward;
+
+        stakedAmount += BigInt(stakedamount);
       }
 
-      if (totalReward > 0) {
+      if (totalReward > 0n) {
         await this.WFAIRToken.transferChain(
           dbClient,
           this.casinoWalletAddr,
@@ -90,7 +93,7 @@ class CasinoTrade {
           totalReward
         );
         await commitDBTransaction(dbClient);
-        return totalReward;
+        return { totalReward, stakedAmount };
       } else {
         await rollbackDBTransaction(dbClient);
       }
