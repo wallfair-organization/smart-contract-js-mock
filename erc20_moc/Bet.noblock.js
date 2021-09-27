@@ -16,6 +16,7 @@ const {
   getBetInteractionsSummary,
   getBetInvestorsChain,
   getAmmPriceActions,
+  getLatestPriceActions
 } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = 'WFAIR';
@@ -117,6 +118,13 @@ class Bet {
    * @returns {Promise<*>}
    */
   getAmmPriceActions = timeOption => getAmmPriceActions(this.betId, timeOption);
+
+  /**
+   * Get all Price actions for a bet for time period (7days/30days/24hours)
+   *
+   * @returns {Promise<*>}
+   */
+  getLatestPriceActions = () => getLatestPriceActions(this.betId);
 
   /**
    * Get Interactions Summary of a Bet until specific date, broken by direction type

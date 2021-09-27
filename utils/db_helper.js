@@ -107,7 +107,13 @@ const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
 from amm_price_action
 where trx_timestamp > localtimestamp - interval '${interval2}' and betid = $3
 group by outcomeindex, trunc
-order by outcomeindex, trunc;`
+order by outcomeindex, trunc;`;
+const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
+    where trx_timestamp = (
+        select max(trx_timestamp)
+            from amm_price_action
+            where betid = $1
+    )`;
 
 /**
  * @returns {Promise<Client>}
@@ -617,10 +623,16 @@ function getTimeParams(timePeriod, betId) {
       return ['8 hours', '30 days', 'hour', 'day', 8, betId];
     case '24hours':
     default:
-      return ['30 minutes', '1 day', 'minute', 'hour', 30, betId];
+      return ['30 minutes', '1 day', 'minute', 'hour', 5, betId];
   }
 }
 
+/**
+ * view the report of a bet
+ *
+ * @param bet_id {String}
+ * @returns {Promise<*>}
+ */
 async function getAmmPriceActions(betId, timeOption) {
   const params = getTimeParams(timeOption, betId);
   const query = GET_AMM_PRICE_ACTIONS(params[0], params[1], params[2]);
@@ -630,6 +642,17 @@ async function getAmmPriceActions(betId, timeOption) {
     trxTimestamp: r.trunc,
     quote: Number(r.quote),
   }));
+}
+
+/**
+ * Gets the most recent price actions for a bet id
+ *
+ * @param betId {String}
+ * @returns {Promise<*>}
+ */
+async function getLatestPriceActions(betId) {
+  const res = await pool.query(GET_LATEST_PRICE_ACTIONS, [betId]);
+  return res.rows;
 }
 
 module.exports = {
@@ -670,4 +693,5 @@ module.exports = {
   getCasinoTrades,
   attemptCashout,
   getAmmPriceActions,
+  getLatestPriceActions
 };

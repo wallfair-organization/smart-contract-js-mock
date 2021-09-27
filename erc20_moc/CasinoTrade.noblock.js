@@ -9,7 +9,7 @@ const {
   insertCasinoTrade,
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
-  getCasinoTrades,
+  // getCasinoTrades,
   attemptCashout,
 } = require('../utils/db_helper');
 
