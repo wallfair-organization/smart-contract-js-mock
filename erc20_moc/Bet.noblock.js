@@ -1,3 +1,4 @@
+const BigDecimal = require('js-big-decimal');
 const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
 const {
@@ -16,7 +17,8 @@ const {
   getBetInteractionsSummary,
   getBetInvestorsChain,
   getAmmPriceActions,
-  getLatestPriceActions
+  getLatestPriceActions,
+  insertPriceActions,
 } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = 'WFAIR';
@@ -40,6 +42,36 @@ class Bet {
     this.collateralToken = new ERC20(COLLATERAL_TOKEN);
     this.ONE = this.collateralToken.ONE;
     this.AMM_INTERACTION_TYPE = DIRECTION;
+  }
+
+  /**
+   * Convert a quote to a number between 0 and 1
+   *
+   * @param value {number || string}
+   */
+  toUnitInterval(value) {
+    const input = new BigDecimal(value);
+    const one = new BigDecimal(1);
+    const oneToken = new BigDecimal(this.ONE);
+    const priceString = one.divide(input).multiply(oneToken).round(2);
+    const price = Number(priceString.value);
+    return Math.min(price, 1);
+  }
+
+  /**
+   * save quotes
+   *
+   * @param outcomeQuotes {number[]}
+   */
+  insertPrices(outcomePrices, timestampOverride) {
+    const timestamp = timestampOverride ?? new Date().toISOString();
+    const values = outcomePrices.map((price, idx) => [
+      this.betId,
+      timestamp,
+      idx,
+      price,
+    ]);
+    return insertPriceActions(values);
   }
 
   /**
@@ -290,6 +322,18 @@ class Bet {
     const poolBalances = await this.getPoolBalances();
     return this._calcBuyOfBalance(poolBalances, investmentAmount, outcome);
   };
+
+  calcInitialPrice() {
+    const textValue = BigDecimal.divide(1, this.outcomes, 2);
+    return Number(textValue);
+  }
+
+  async calcBuyAllOutcomes(investmentAmountInput) {
+    const investmentAmount = investmentAmountInput ?? this.ONE;
+    const poolBalances = await this.getPoolBalances();
+    const outcomes = [...Array(this.outcomes).keys()]
+    return outcomes.map(o => this._calcBuyOfBalance(poolBalances, investmentAmount, o));
+  }
 
   /**
    * Calculate the amount of outcome-tokens able to buy using the investment amount
