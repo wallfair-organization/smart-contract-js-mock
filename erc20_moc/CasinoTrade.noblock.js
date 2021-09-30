@@ -11,6 +11,7 @@ const {
   setCasinoTradeOutcomes,
   // getCasinoTrades,
   attemptCashout,
+  getCasinoTradesByUserAndStates,
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -141,6 +142,8 @@ class CasinoTrade {
       throw e;
     }
   };
+
+  getCasinoTradesByUserIdAndStates = async (userId, states) => await getCasinoTradesByUserAndStates(userId, states);
 }
 
 module.exports = CasinoTrade;
