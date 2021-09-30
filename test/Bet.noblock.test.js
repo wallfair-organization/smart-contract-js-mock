@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { nanoid } = require('nanoid');
 
 const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
@@ -472,4 +473,33 @@ test('Test Weird Jonas Case', async () => {
   await bet.getOutcomeToken(1).mint(bet.walletId, 2147480000n);
 
   expect(await bet.calcSellFromAmount(989886n, 0)).toBe(490099n);
+});
+
+test('Initial Quote Prices set correctly', () => {
+  const bet = new Bet(`test-bet_${nanoid(10)}`, 4);
+  const price = bet.calcInitialPrice();
+  expect(price).toEqual(0.25);
+});
+
+test('Converts price to decimal', () => {
+  const bet = new Bet('test-bet', 4);
+  const price = bet.toUnitInterval(20000);
+  expect(price).toEqual(0.5);
+});
+
+test('outcome prices change on buy', async () => {
+  const id = `test_id_${nanoid(10)}`;
+  const investorWalletId = `investorWalletId_${nanoid(10)}`;
+
+  await WFAIR.mint(investorWalletId, investAmount);
+
+  
+  const bet = new Bet(id, 2);
+  await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+  const price = await bet.calcBuyAllOutcomes();
+  expect(price[0]).toEqual(price[1])
+  await bet.buy(investorWalletId, 100000n, 0, 1n);
+  const price2 = await bet.calcBuyAllOutcomes();
+  expect(price2).toEqual([18024n, 21729n]);
 });

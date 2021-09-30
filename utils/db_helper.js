@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const format = require('pg-format');
 const fs = require('fs');
 
 const pool = new Pool({
@@ -116,6 +117,8 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
             where betid = $1
     )`;
 
+const INSERT_PRICE_ACTION = 'INSERT INTO amm_price_action (betid, trx_timestamp, outcomeindex, quote) values %L';
+
 /**
  * @returns {Promise<Client>}
  */
@@ -171,6 +174,20 @@ async function commitDBTransaction(client) {
 async function rollbackDBTransaction(client) {
   await client.query(ROLLBACK);
   client.release();
+}
+
+async function runInTransaction(commands) {
+  const client = await createDBTransaction();
+  let results = [];
+  try {
+    for (const command of commands) {
+      const resultLocal = await command(client);
+      results.push(resultLocal);
+    }
+    await commitDBTransaction(client);
+  } catch (error) {
+    await rollbackDBTransaction(client);
+  }
 }
 
 /**
@@ -652,7 +669,7 @@ async function getAmmPriceActions(betId, timeOption) {
   return res.rows.map(r => ({
     outcomeIndex: r.outcomeindex,
     trxTimestamp: r.trunc,
-    quote: Number(r.quote),
+    quote: r.quote,
   }));
 }
 
@@ -667,7 +684,15 @@ async function getLatestPriceActions(betId) {
   return res.rows;
 }
 
+async function insertPriceActions(values) {
+  const [result] = await runInTransaction([
+    client => client.query(format(INSERT_PRICE_ACTION, values)),
+  ]);
+  return result.rows;
+}
+
 module.exports = {
+  runInTransaction,
   pool,
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -706,5 +731,6 @@ module.exports = {
   getCasinoTradesByUserAndStates,
   attemptCashout,
   getAmmPriceActions,
-  getLatestPriceActions
+  getLatestPriceActions,
+  insertPriceActions,
 };

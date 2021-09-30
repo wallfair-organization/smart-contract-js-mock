@@ -21,7 +21,7 @@ beforeEach(async () => {
 /**
  * two people will trade, one will lose, one will win
  */
-test('Run a game', async () => {
+test.skip('Run a game', async () => {
   const casino = new Casino(casinoWallet);
 
   // mint players with 5000 WFAIR balance
