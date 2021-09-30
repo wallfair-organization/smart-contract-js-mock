@@ -476,7 +476,7 @@ test('Test Weird Jonas Case', async () => {
 });
 
 test('Initial Quote Prices set correctly', () => {
-  const bet = new Bet('test-bet', 4);
+  const bet = new Bet(`test-bet_${nanoid(10)}`, 4);
   const price = bet.calcInitialPrice();
   expect(price).toEqual(0.25);
 });

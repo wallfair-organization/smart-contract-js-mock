@@ -656,7 +656,7 @@ async function getAmmPriceActions(betId, timeOption) {
   return res.rows.map(r => ({
     outcomeIndex: r.outcomeindex,
     trxTimestamp: r.trunc,
-    quote: Number(r.quote),
+    quote: r.quote,
   }));
 }
 
