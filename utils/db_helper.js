@@ -98,7 +98,8 @@ const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *;';
-
+const GET_CASINO_TRADES_BY_USER_AND_STATES =
+  'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -398,6 +399,17 @@ async function getCasinoTrades(client, gameId, state) {
 }
 
 /**
+ * Gets casino trades by userId and states
+ * 
+ * @param {String} userId
+ * @param {CASINO_TRADE_STATE[]} states
+ */
+ async function getCasinoTradesByUserAndStates(userId, states) {
+  const res = await pool.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
+  return res.rows;
+}
+
+/**
  * Save a Interaction with the AMM
  * Build for Transactions
  *
@@ -691,6 +703,7 @@ module.exports = {
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
   getCasinoTrades,
+  getCasinoTradesByUserAndStates,
   attemptCashout,
   getAmmPriceActions,
   getLatestPriceActions
