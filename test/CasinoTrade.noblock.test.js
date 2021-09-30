@@ -36,7 +36,8 @@ test('Run a game', async () => {
   await casino.lockOpenTrades('gameId');
 
   // compute winners
-  const winners = await casino.rewardWinners('gameId', 9.99);
+  const result = await casino.rewardWinners('gameId', 9.99);
+  const winners = result.filter(r => r.state === 2);
 
   // run tests
   expect(winners.length).toBe(1); // there should be only one winner

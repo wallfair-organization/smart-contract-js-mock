@@ -93,7 +93,7 @@ const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state) VALUES ($1, $2, $3, $4);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameId = $2 WHERE state = ${CASINO_TRADE_STATE.OPEN};`;
 const SET_CASINO_TRADE_OUTCOMES =
-  'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameId = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount;';
+  'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameId = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
