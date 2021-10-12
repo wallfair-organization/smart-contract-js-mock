@@ -16,7 +16,7 @@ const {
   getBetInteractionsSummary,
   getBetInvestorsChain,
   getAmmPriceActions,
-  getLatestPriceActions
+  getLatestPriceActions,
 } = require('../utils/db_helper');
 
 const COLLATERAL_TOKEN = 'WFAIR';
@@ -53,7 +53,7 @@ class Bet {
   /**
    * Get a List with all Outcome Tokens as ERC20
    *
-   * @returns {*[]}
+   * @returns {ERC20[]}
    */
   getOutcomeTokens = () => {
     const tokens = [];
@@ -117,7 +117,8 @@ class Bet {
    *
    * @returns {Promise<*>}
    */
-  getAmmPriceActions = timeOption => getAmmPriceActions(this.betId, timeOption);
+  getAmmPriceActions = (timeOption) =>
+    getAmmPriceActions(this.betId, timeOption);
 
   /**
    * Get all Price actions for a bet for time period (7days/30days/24hours)
@@ -193,12 +194,21 @@ class Bet {
   /**
    * Add more Liquidity to this bet
    *
-   * @param provider {string}
-   * @param amount {bigint}
+   * @param {string} provider
+   * @param {BigInt} amount
+   * @param {{[key: string]: number}} probabilityDistribution
    * @returns {Promise<void>}
    */
-  addLiquidity = async (provider, amount) => {
-    // TODO: this works only when market is empty and for 50:50 initial outcome probs, reimplement
+  addLiquidity = async (provider, amount, probabilityDistribution) => {
+    // TODO: this works only when market is empty
+    const sanitizedDistribution =
+      this._sanitizeProbabilities(probabilityDistribution);
+
+    const outcomeBalances = this._getOutcomeBalances(
+      sanitizedDistribution,
+      amount
+    );
+
     const dbClient = await createDBTransaction();
     try {
       await this.collateralToken.transferChain(
@@ -209,13 +219,149 @@ class Bet {
       );
       const tokens = this.getOutcomeTokens();
       for (const token of tokens) {
-        await token.mintChain(dbClient, this.walletId, amount);
+        await token.mintChain(
+          dbClient,
+          this.walletId,
+          outcomeBalances[token.symbol]
+        );
       }
 
       await commitDBTransaction(dbClient);
     } catch (e) {
       await rollbackDBTransaction(dbClient);
       throw e;
+    }
+  };
+
+  /**
+   * Calculates starting liquidity distribution based on outcome probability
+   *
+   * @param {{[key: string]: number}} outcomeProbabilities outcome probability
+   * map where keys are outcome indices
+   * @param {BigInt} amount base liquidity for distribution
+   * @returns {{[key: string]: BigInt}} outcome symbol balance map
+   */
+  _getOutcomeBalances = (outcomeProbabilities, amount) => {
+    return Object.keys(outcomeProbabilities)
+      .map((key, _, { length: numberOfOutcomes }) => ({
+        symbol: this.getOutcomeKey(key),
+        balance: this._calculateBalanceThroughProbability(
+          outcomeProbabilities[key],
+          amount,
+          numberOfOutcomes
+        ),
+      }))
+      .reduce(
+        (accumulator, { symbol, balance }) => ({
+          ...accumulator,
+          [symbol]: balance,
+        }),
+        {}
+      );
+  };
+
+  /**
+   * Calculates outcome balance based on outcome probability.
+   * Increases/decreases `amount` as the result of probability in relation to
+   * the `numberOfOutcomes`.
+   *
+   * Examples:
+   * ```
+   * _calculateBalanceThroughProbability(0.7, 50_0000n, 2); // returns 40_0000n
+   * _calculateBalanceThroughProbability(0.3, 50_0000n, 2); // returns 60_0000n
+   * ```
+   * ...where the more likely outcome now has a lower balance and the less
+   * likely one has a greater balance.
+   *
+   * @param {number} probability decimal between 0 and 1
+   * @param {BitInt} amount liquidity amount
+   * @param {number} numberOfOutcomes
+   * @returns {BigInt} calculated outcome balance inversely correlated to
+   * probability.
+   */
+  _calculateBalanceThroughProbability = (
+    probability,
+    amount,
+    numberOfOutcomes
+  ) => {
+    const probabilityDelta = probability - 1 / numberOfOutcomes;
+    const probabilityCoeficcient = 1 - probabilityDelta;
+    const outcomeBalance =
+      (amount * BigInt(Math.round(probabilityCoeficcient * 100))) / 100n;
+
+    return outcomeBalance;
+  };
+
+  /**
+   * Validates probabilities object and returns it if valid, use default
+   * fallback if invalid
+   *
+   * @param {{[key: string]: number}} outcomeProbabilities
+   * @returns {{[key: string]: number}}
+   */
+  _sanitizeProbabilities = (outcomeProbabilities) => {
+    try {
+      this._validateProbabilities(outcomeProbabilities);
+      return outcomeProbabilities;
+    } catch (e) {
+      const tokens = this.getOutcomeTokens();
+      const defaultProbability = Math.round((1 / tokens.length) * 100) / 100;
+
+      console.error(e.message);
+      console.info(
+        `Using default probabilities, ${defaultProbability} for each outcome.`
+      );
+
+      return tokens.reduce(
+        (acc, _, index) => ({
+          ...acc,
+          [String(index)]: defaultProbability,
+        }),
+        {}
+      );
+    }
+  };
+
+  /**
+   * Validates probabilities array by ensuring all probabilities are
+   * - between 0 and 1,
+   * - summed up into a value of 1,
+   *
+   * @param {{[key: string]: number}} outcomeProbabilities
+   * @throws {NoWeb3Exception} when outcome probabilities object is not
+   * structured correctly
+   */
+  _validateProbabilities = (outcomeProbabilities) => {
+    if (!outcomeProbabilities) {
+      throw new NoWeb3Exception(
+        `No probabilities provided. Received: ${JSON.stringify(
+          outcomeProbabilities
+        )};`
+      );
+    }
+
+    const outcomeKeys = Object.keys(outcomeProbabilities);
+    const probabilities = outcomeKeys.map((key) => outcomeProbabilities[key]);
+
+    if (
+      probabilities.some((p) => p < 0 || p > 1) ||
+      probabilities.reduce((acc, p) => acc + p, 0) !== 1
+    ) {
+      throw new NoWeb3Exception(
+        `Probabilities must be in 0-1 range and their sum must be 1.
+        Received: [${probabilities.join(', ')}];`
+      );
+    }
+
+    const outcomeSymbols = this.getOutcomeTokens().map(({ symbol }) => symbol);
+
+    if (
+      probabilities.length !== outcomeSymbols.length &&
+      outcomeKeys.map(this.getOutcomeKey).every(outcomeSymbols.includes)
+    ) {
+      throw new NoWeb3Exception(
+        `Incorrect number of probabilities. Received: ${probabilities.length}; Expected: ${outcomeSymbols.length};`
+      );
     }
   };
 
