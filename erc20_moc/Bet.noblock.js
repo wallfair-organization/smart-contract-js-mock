@@ -356,8 +356,8 @@ class Bet {
     const outcomeSymbols = this.getOutcomeTokens().map(({ symbol }) => symbol);
 
     if (
-      probabilities.length !== outcomeSymbols.length &&
-      outcomeKeys.map(this.getOutcomeKey).every(outcomeSymbols.includes)
+      probabilities.length !== outcomeSymbols.length ||
+      outcomeKeys.map(key => this.getOutcomeKey(key)).some(key => !outcomeSymbols.includes(key))
     ) {
       throw new NoWeb3Exception(
         `Incorrect number of probabilities. Received: ${probabilities.length}; Expected: ${outcomeSymbols.length};`
