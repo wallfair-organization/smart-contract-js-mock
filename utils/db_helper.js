@@ -352,14 +352,20 @@ async function insertCasinoTrade(
 
 /**
  * Attempts to cashout user from a casino trade
- * 
- * @param {Client} client 
- * @param {String} userwalletAddr 
- * @param {String} gameId 
- * @returns 
+ *
+ * @param {Client} client
+ * @param {String} userwalletAddr
+ * @param {String} gameId
+ * @returns
  */
 async function attemptCashout(client, userwalletAddr, gameId, crashFactor) {
-  return await client.query(SET_CASINO_TRADE_STATE, [CASINO_TRADE_STATE.WIN, crashFactor, gameId, CASINO_TRADE_STATE.LOCKED, userwalletAddr]);
+  return await client.query(SET_CASINO_TRADE_STATE, [
+    CASINO_TRADE_STATE.WIN,
+    crashFactor,
+    gameId,
+    CASINO_TRADE_STATE.LOCKED,
+    userwalletAddr,
+  ]);
 }
 
 /**
@@ -400,12 +406,15 @@ async function getCasinoTrades(client, gameId, state) {
 
 /**
  * Gets casino trades by userId and states
- * 
+ *
  * @param {String} userId
  * @param {CASINO_TRADE_STATE[]} states
  */
- async function getCasinoTradesByUserAndStates(userId, states) {
-  const res = await pool.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
+async function getCasinoTradesByUserAndStates(userId, states) {
+  const res = await pool.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [
+    userId,
+    states,
+  ]);
   return res.rows;
 }
 
@@ -649,7 +658,7 @@ async function getAmmPriceActions(betId, timeOption) {
   const params = getTimeParams(timeOption, betId);
   const query = GET_AMM_PRICE_ACTIONS(params[0], params[1], params[2]);
   const res = await pool.query(query, params.slice(3));
-  return res.rows.map(r => ({
+  return res.rows.map((r) => ({
     outcomeIndex: r.outcomeindex,
     trxTimestamp: r.trunc,
     quote: Number(r.quote),
@@ -706,5 +715,5 @@ module.exports = {
   getCasinoTradesByUserAndStates,
   attemptCashout,
   getAmmPriceActions,
-  getLatestPriceActions
+  getLatestPriceActions,
 };

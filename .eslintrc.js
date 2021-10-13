@@ -5,17 +5,19 @@ module.exports = {
     es2021: true,
     jest: true,
   },
-  extends: ['eslint:recommended'],
+  root: true,
+  extends: ['eslint:recommended', 'plugin:prettier/recommended'],
   parser: 'babel-eslint',
   parserOptions: {
     ecmaVersion: 12,
     sourceType: 'module',
+    extraFileExtensions: ['.json'],
     ecmaFeatures: {
       modules: true,
       experimentalObjectRestSpread: true,
     },
   },
   rules: {
-    'no-undef': 0
+    'no-undef': 0,
   },
 };
