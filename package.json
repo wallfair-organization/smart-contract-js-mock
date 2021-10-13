@@ -1,7 +1,7 @@
 {
   "name": "@wallfair.io/smart_contract_mock",
   "author": "Wallfair",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Wallfair Smart Contract Contract Mock in JS.",
   "license": "AGPL-3.0-only",
   "repository": {
@@ -13,7 +13,8 @@
     "start": "node index.js",
     "lint": "eslint --max-warnings=-1 --cache --c .eslintrc.js --ext .js '.'",
     "lint:fix": "eslint --cache --c .eslintrc.js --ext .js --fix '.'",
-    "test": "node --trace-warnings node_modules/.bin/jest -i",
+    "test": "npm run lint && npm run test:unit",
+    "test:unit": "jest -i --detectOpenHandles --passWithNoTests --forceExit",
     "publish": "npm publish --access=public"
   },
   "keywords": [

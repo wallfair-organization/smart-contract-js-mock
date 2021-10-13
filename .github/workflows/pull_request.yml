@@ -34,8 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install modules
-        run: npm install
-      - name: Eslint
-        run: npm run lint
+        run: npm ci
       - name: Run tests
         run: npm test
