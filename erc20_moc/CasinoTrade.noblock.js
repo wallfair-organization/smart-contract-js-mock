@@ -65,10 +65,15 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      let res = await attemptCashout(dbClient, userWalletAddr, gameId, crashFactor);
+      let res = await attemptCashout(
+        dbClient,
+        userWalletAddr,
+        gameId,
+        crashFactor
+      );
 
       if (res.rows.length == 0) {
-        throw "Transaction did not succeed";
+        throw 'Transaction did not succeed';
       }
 
       let totalReward = 0n;
@@ -86,7 +91,6 @@ class CasinoTrade {
         stakedAmount += BigInt(stakedamount);
       }
 
-      
       if (totalReward > 0n) {
         await this.WFAIRToken.transferChain(
           dbClient,
@@ -100,7 +104,6 @@ class CasinoTrade {
       } else {
         await rollbackDBTransaction(dbClient);
       }
-
     } catch (e) {
       await rollbackDBTransaction(dbClient);
       throw e;
@@ -111,7 +114,11 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      let result = await setCasinoTradeOutcomes(dbClient, gameId, decidedCrashFactor);
+      let result = await setCasinoTradeOutcomes(
+        dbClient,
+        gameId,
+        decidedCrashFactor
+      );
       let winners = result.rows;
       /*let winners = await getCasinoTrades(
         dbClient,
@@ -143,7 +150,8 @@ class CasinoTrade {
     }
   };
 
-  getCasinoTradesByUserIdAndStates = async (userId, states) => await getCasinoTradesByUserAndStates(userId, states);
+  getCasinoTradesByUserIdAndStates = async (userId, states) =>
+    await getCasinoTradesByUserAndStates(userId, states);
 }
 
 module.exports = CasinoTrade;
