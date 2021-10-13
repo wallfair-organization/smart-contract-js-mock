@@ -18,6 +18,7 @@ module.exports = {
     },
   },
   rules: {
+    'prettier/prettier': 0,
     'no-undef': 0,
   },
 };
