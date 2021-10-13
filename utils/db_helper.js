@@ -55,12 +55,9 @@ const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
 const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
 
-const GET_BALANCE_OF_USER =
-  'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
-const GET_ALL_BALANCE_OF_USER =
-  'SELECT * FROM token_balances WHERE owner = $1;';
-const GET_ALL_BALANCE_OF_TOKEN =
-  'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
+const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
+const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
+const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
 const GET_LIMIT_BALANCE_OF_TOKEN =
   'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY owner, balance DESC LIMIT $2;';
 
@@ -69,8 +66,7 @@ const GET_TRANSACTIONS_OF_USER =
 const GET_TRANSACTIONS_OF_USER_AND_TOKEN =
   'SELECT * FROM token_transactions WHERE symbol = $1 AND (sender = $2 OR receiver = $2);';
 
-const GET_ALL_AMM_INTERACTIONS_OF_USER =
-  'SELECT * FROM amm_interactions WHERE buyer = $1;';
+const GET_ALL_AMM_INTERACTIONS_OF_USER = 'SELECT * FROM amm_interactions WHERE buyer = $1;';
 const GET_BET_INTERACTIONS = 'SELECT * FROM amm_interactions WHERE bet = $1';
 const GET_BET_INTERACTIONS_SUMMARY =
   'SELECT outcome, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 AND direction = $2 AND trx_timestamp <= $3 GROUP BY outcome;';
@@ -281,19 +277,8 @@ async function viewLimitBalancesOfToken(symbol, limit) {
  * @param newBalance {bigint}
  * @returns {Promise<void>}
  */
-async function updateBalanceOfUser(
-  client,
-  user,
-  symbol,
-  timestamp,
-  newBalance
-) {
-  await client.query(UPDATE_BALANCE_OF_USER, [
-    user,
-    symbol,
-    timestamp,
-    newBalance,
-  ]);
+async function updateBalanceOfUser(client, user, symbol, timestamp, newBalance) {
+  await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, newBalance]);
 }
 
 /**
@@ -308,21 +293,8 @@ async function updateBalanceOfUser(
  * @param timestamp
  * @returns {Promise<void>}
  */
-async function insertTransaction(
-  client,
-  sender,
-  receiver,
-  amount,
-  symbol,
-  timestamp
-) {
-  await client.query(INSERT_TOKEN_TRANSACTION, [
-    sender,
-    receiver,
-    amount,
-    symbol,
-    timestamp,
-  ]);
+async function insertTransaction(client, sender, receiver, amount, symbol, timestamp) {
+  await client.query(INSERT_TOKEN_TRANSACTION, [sender, receiver, amount, symbol, timestamp]);
 }
 
 /**
@@ -336,12 +308,7 @@ async function insertTransaction(
  * @param state {Number}
  * @param gameId {String}
  */
-async function insertCasinoTrade(
-  client,
-  userWalletAddr,
-  crashFactor,
-  stakedAmount
-) {
+async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmount) {
   await client.query(INSERT_CASINO_TRADE, [
     userWalletAddr,
     crashFactor,
@@ -375,10 +342,7 @@ async function attemptCashout(client, userwalletAddr, gameId, crashFactor) {
  * @param gameId {String}
  */
 async function lockOpenCasinoTrades(client, gameId) {
-  await client.query(LOCK_OPEN_CASINO_TRADES, [
-    CASINO_TRADE_STATE.LOCKED,
-    gameId,
-  ]);
+  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameId]);
 }
 
 /**
@@ -411,10 +375,7 @@ async function getCasinoTrades(client, gameId, state) {
  * @param {CASINO_TRADE_STATE[]} states
  */
 async function getCasinoTradesByUserAndStates(userId, states) {
-  const res = await pool.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [
-    userId,
-    states,
-  ]);
+  const res = await pool.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
   return res.rows;
 }
 
@@ -490,10 +451,7 @@ async function viewTransactionOfUser(user) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbolChain(client, user, symbol) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [
-    symbol,
-    user,
-  ]);
+  const res = await client.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
   return res.rows;
 }
 
@@ -505,10 +463,7 @@ async function viewTransactionOfUserBySymbolChain(client, user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbol(user, symbol) {
-  const res = await pool.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [
-    symbol,
-    user,
-  ]);
+  const res = await pool.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
   return res.rows;
 }
 
@@ -564,11 +519,7 @@ async function getBetInteractions(bet, startDate, direction) {
  * @returns {Promise<*>}
  */
 async function getBetInteractionsSummary(bet, direction, endDate) {
-  const res = await pool.query(GET_BET_INTERACTIONS_SUMMARY, [
-    bet,
-    direction,
-    endDate,
-  ]);
+  const res = await pool.query(GET_BET_INTERACTIONS_SUMMARY, [bet, direction, endDate]);
   return res.rows;
 }
 
