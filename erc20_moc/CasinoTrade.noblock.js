@@ -34,12 +34,7 @@ class CasinoTrade {
         this.casinoWalletAddr,
         stakedAmount
       );
-      await insertCasinoTrade(
-        dbClient,
-        userWalletAddr,
-        crashFactor,
-        stakedAmount
-      );
+      await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -65,12 +60,7 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      let res = await attemptCashout(
-        dbClient,
-        userWalletAddr,
-        gameId,
-        crashFactor
-      );
+      let res = await attemptCashout(dbClient, userWalletAddr, gameId, crashFactor);
 
       if (res.rows.length == 0) {
         throw 'Transaction did not succeed';
@@ -81,10 +71,7 @@ class CasinoTrade {
 
       for (let row of res.rows) {
         let { stakedamount } = row;
-        let reward = bigDecimal.multiply(
-          BigInt(stakedamount),
-          parseFloat(crashFactor)
-        );
+        let reward = bigDecimal.multiply(BigInt(stakedamount), parseFloat(crashFactor));
         reward = BigInt(bigDecimal.round(reward));
         totalReward += reward;
 
@@ -114,11 +101,7 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      let result = await setCasinoTradeOutcomes(
-        dbClient,
-        gameId,
-        decidedCrashFactor
-      );
+      let result = await setCasinoTradeOutcomes(dbClient, gameId, decidedCrashFactor);
       let winners = result.rows;
       /*let winners = await getCasinoTrades(
         dbClient,
@@ -133,12 +116,7 @@ class CasinoTrade {
         reward = BigInt(bigDecimal.round(reward));
         winner.reward = reward;
 
-        await this.WFAIRToken.transferChain(
-          dbClient,
-          this.casinoWalletAddr,
-          winner.userid,
-          reward
-        );
+        await this.WFAIRToken.transferChain(dbClient, this.casinoWalletAddr, winner.userid, reward);
       }
 
       await commitDBTransaction(dbClient);
