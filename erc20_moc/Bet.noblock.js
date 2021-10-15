@@ -242,53 +242,39 @@ class Bet {
    * @returns {{[key: string]: BigInt}} outcome symbol balance map
    */
   _getOutcomeBalances = (outcomeProbabilities, amount) => {
-    return Object.keys(outcomeProbabilities)
-      .map((key, _, { length: numberOfOutcomes }) => ({
-        symbol: this.getOutcomeKey(key),
-        balance: this._calculateBalanceThroughProbability(
-          outcomeProbabilities[key],
-          amount,
-          numberOfOutcomes
-        ),
-      }))
+    return Object
+      .keys(outcomeProbabilities)
       .reduce(
-        (accumulator, { symbol, balance }) => ({
+        (accumulator, key, _, { length: numberOfOutcomes }) => ({
           ...accumulator,
-          [symbol]: balance,
+          [this.getOutcomeKey(key)]: this._calculateBalanceThroughProbability(
+            outcomeProbabilities[key],
+            amount,
+            numberOfOutcomes
+          ),
         }),
-        {}
+        {} // accumulator
       );
   };
 
   /**
    * Calculates outcome balance based on outcome probability.
-   * Increases/decreases `amount` as the result of probability in relation to
-   * the `numberOfOutcomes`.
-   *
-   * Examples:
-   * ```
-   * _calculateBalanceThroughProbability(0.7, 50_0000n, 2); // returns 40_0000n
-   * _calculateBalanceThroughProbability(0.3, 50_0000n, 2); // returns 60_0000n
-   * ```
-   * ...where the more likely outcome now has a lower balance and the less
-   * likely one has a greater balance.
    *
    * @param {number} probability decimal between 0 and 1
-   * @param {BitInt} amount liquidity amount
+   * @param {BigInt} liquidity liquidity amount
    * @param {number} numberOfOutcomes
    * @returns {BigInt} calculated outcome balance inversely correlated to
    * probability.
    */
   _calculateBalanceThroughProbability = (
     probability,
-    amount,
+    liquidity,
     numberOfOutcomes
   ) => {
-    const probabilityDelta = probability - 1 / numberOfOutcomes;
-    const probabilityCoeficcient = 1 - probabilityDelta;
+    const pooledBalance = liquidity * BigInt(numberOfOutcomes);
     const outcomeBalance =
-      (amount * BigInt(Math.round(probabilityCoeficcient * 100))) / 100n;
-
+      (pooledBalance * BigInt(Math.round(probability * 100))) / 100n;
+  
     return outcomeBalance;
   };
 
@@ -307,7 +293,7 @@ class Bet {
       const tokens = this.getOutcomeTokens();
       const defaultProbability = Math.round((1 / tokens.length) * 100) / 100;
 
-      console.error(e.message);
+      console.warn(e.message);
       console.info(
         `Using default probabilities, ${defaultProbability} for each outcome.`
       );
@@ -342,14 +328,15 @@ class Bet {
 
     const outcomeKeys = Object.keys(outcomeProbabilities);
     const probabilities = outcomeKeys.map((key) => outcomeProbabilities[key]);
+    const probabilitySum = probabilities.reduce((acc, p) => +(acc + p).toFixed(2), 0);
 
     if (
       probabilities.some((p) => p < 0 || p > 1) ||
-      probabilities.reduce((acc, p) => acc + p, 0) !== 1
+      probabilitySum !== 1
     ) {
       throw new NoWeb3Exception(
         `Probabilities must be in 0-1 range and their sum must be 1.
-        Received: [${probabilities.join(', ')}];`
+        Received: sum([${probabilities.join(', ')}]) = ${probabilitySum};`
       );
     }
 
@@ -390,10 +377,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
 
@@ -464,10 +451,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
     const returnAmountPlusFees = returnAmount + this._getFee(returnAmount);
@@ -871,10 +858,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
     await insertReport(this.betId, reporter, outcome, new Date());
@@ -1062,10 +1049,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
 
