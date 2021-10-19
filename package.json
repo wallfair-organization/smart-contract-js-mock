@@ -1,7 +1,7 @@
 {
   "name": "@wallfair.io/smart_contract_mock",
   "author": "Wallfair",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Wallfair Smart Contract Contract Mock in JS.",
   "license": "AGPL-3.0-only",
   "repository": {
