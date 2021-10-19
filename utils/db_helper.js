@@ -43,8 +43,10 @@ const CREATE_BET_REPORTS =
   'CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome smallint not null, report_timestamp timestamp not null);';
 const CREATE_AMM_INTERACTIONS =
   'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
-const CREATE_CASINO_TRADES =
-  'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);';
+  const CREATE_CASINO_MATCHES = 
+  'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
+  const CREATE_CASINO_TRADES =
+  'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
 
 // ALTER TABLE token_transactions ALTER COLUMN amount TYPE BIGINT;
 // ALTER TABLE token_balances ALTER COLUMN balance TYPE BIGINT;
@@ -54,6 +56,7 @@ const TEARDOWN_TOKEN_BALANCES = 'DROP TABLE token_balances;';
 const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
 const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
+const TEARDOWN_CASINO_MATCHES = 'DROP TABLE casino_matches';
 
 const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
 const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
@@ -85,6 +88,8 @@ const INSERT_REPORT =
   'INSERT INTO bet_reports(bet_id, reporter, outcome, report_timestamp) VALUES($1, $2, $3, $4);';
 const GET_REPORT = 'SELECT * FROM bet_reports WHERE bet_id = $1;';
 
+const INSERT_CASINO_MATCH = 
+  'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds) VALUES ($1, $2, $3, $4);';
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state) VALUES ($1, $2, $3, $4);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameId = $2 WHERE state = ${CASINO_TRADE_STATE.OPEN};`;
@@ -127,6 +132,7 @@ async function setupDatabase() {
   await pool.query(CREATE_TOKEN_BALANCES);
   await pool.query(CREATE_BET_REPORTS);
   await pool.query(CREATE_AMM_INTERACTIONS);
+  await pool.query(CREATE_CASINO_MATCHES);
   await pool.query(CREATE_CASINO_TRADES);
 }
 
@@ -139,6 +145,7 @@ async function teardownDatabase() {
   await pool.query(TEARDOWN_BET_REPORTS);
   await pool.query(TEARDOWN_AMM_INTERACTIONS);
   await pool.query(TEARDOWN_CASINO_TRADES);
+  await pool.query(TEARDOWN_CASINO_MATCHES);
 }
 
 /**
@@ -341,8 +348,10 @@ async function attemptCashout(client, userwalletAddr, gameId, crashFactor) {
  * @param client {Client}
  * @param gameId {String}
  */
-async function lockOpenCasinoTrades(client, gameId) {
-  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameId]);
+async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS) {
+  let res = client.query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
+  
+  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash]);
 }
 
 /**

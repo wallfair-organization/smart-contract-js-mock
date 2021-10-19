@@ -43,11 +43,11 @@ class CasinoTrade {
     }
   };
 
-  lockOpenTrades = async (gameId) => {
+  lockOpenTrades = async (gameId, gameHash, crashFactor, gameLengthMS) => {
     const dbClient = await createDBTransaction();
 
     try {
-      await lockOpenCasinoTrades(dbClient, gameId);
+      await lockOpenCasinoTrades(dbClient, gameId, gameHash, crashFactor, gameLengthMS);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
