@@ -19,35 +19,24 @@ beforeEach(async () => {
   await WFAIR.mint(casinoWallet, liquidityAmount);
 });
 
-/**
- * two people will trade, one will lose, one will win
- */
 test('Run a game', async () => {
   const casino = new Casino(casinoWallet);
 
-  // mint players with 5000 WFAIR balance
-  await WFAIR.mint(`${BASE_WALLET}_1`, 5000n * WFAIR.ONE);
-  await WFAIR.mint(`${BASE_WALLET}_2`, 5000n * WFAIR.ONE);
-  await WFAIR.mint(`${BASE_WALLET}_3`, 5000n * WFAIR.ONE);
-  await WFAIR.mint(`${BASE_WALLET}_4`, 5000n * WFAIR.ONE);
-  await WFAIR.mint(`${BASE_WALLET}_5`, 5000n * WFAIR.ONE);
+  for (let i = 1; i <= 5; i++) {
+    // mint players with 5000 WFAIR balance
+    await WFAIR.mint(`${BASE_WALLET}_${i}`, 5000n * WFAIR.ONE);
 
-  // eahc player places a trade
-  await casino.placeTrade(`${BASE_WALLET}_1`, 2000n * WFAIR.ONE, 999);
-  await casino.placeTrade(`${BASE_WALLET}_2`, 2000n * WFAIR.ONE, 999);
-  await casino.placeTrade(`${BASE_WALLET}_3`, 2000n * WFAIR.ONE, 999);
-  await casino.placeTrade(`${BASE_WALLET}_4`, 2000n * WFAIR.ONE, 999);
-  await casino.placeTrade(`${BASE_WALLET}_5`, 2000n * WFAIR.ONE, 999);
+    // each player places a trade
+    await casino.placeTrade(`${BASE_WALLET}_${i}`, 2000n * WFAIR.ONE, 999);
+  }
 
   // lock the trades
   await casino.lockOpenTrades('gameId');
 
-  // don't add await, due we want simulated concurrent transactions !
-  setTimeout(() => {
-    casino.cashout(`${BASE_WALLET}_1`, 2.1, 'gameId');
-    casino.cashout(`${BASE_WALLET}_2`, 2.1, 'gameId');
-    casino.cashout(`${BASE_WALLET}_3`, 2.1, 'gameId');
-    casino.cashout(`${BASE_WALLET}_4`, 2.1, 'gameId');
-    casino.cashout(`${BASE_WALLET}_5`, 2.1, 'gameId');
-  }, 1000);
+  // cashout
+  for (let i = 1; i <= 5; i++) {
+    expect((await casino.cashout(`${BASE_WALLET}_${i}`, 2.1, 'gameId')).totalReward).toBe(
+      42000000n
+    );
+  }
 });

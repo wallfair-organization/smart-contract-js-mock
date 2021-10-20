@@ -94,7 +94,7 @@ const SET_CASINO_TRADE_OUTCOMES =
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
-  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = (SELECT gameId FROM casino_trades WHERE gameId = $3 AND state = $4 AND userId = $5 FOR UPDATE SKIP LOCKED) AND state = $4 and userId = $5 RETURNING *;';
+  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = (SELECT gameId FROM casino_trades WHERE gameId = $3 AND state = $4 AND userId = $5 FOR UPDATE SKIP LOCKED) AND state = $4 AND userId = $5 RETURNING *;';
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 
