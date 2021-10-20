@@ -34,6 +34,7 @@ const BEGIN = 'BEGIN';
 const COMMIT = 'COMMIT';
 const ROLLBACK = 'ROLLBACK';
 const SET_ISOLATION_LEVEL = 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ';
+const SET_ISOLATION_READ_COMMITTED = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
 
 const CREATE_TOKEN_TRANSACTIONS =
   'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
@@ -93,7 +94,7 @@ const SET_CASINO_TRADE_OUTCOMES =
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
-  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *;';
+  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = (SELECT gameId FROM casino_trades WHERE gameId = $3 AND state = $4 AND userId = $5 FOR UPDATE SKIP LOCKED) AND state = $4 and userId = $5 RETURNING *;';
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 
@@ -148,6 +149,16 @@ async function createDBTransaction() {
   const client = await getConnection();
   await client.query(BEGIN);
   await client.query(SET_ISOLATION_LEVEL);
+  return client;
+}
+
+/**
+ * @returns {Promise<Client>}
+ */
+async function createCasinoDBTransaction() {
+  const client = await getConnection();
+  await client.query(BEGIN);
+  await client.query(SET_ISOLATION_READ_COMMITTED);
   return client;
 }
 
@@ -634,6 +645,7 @@ module.exports = {
   setupDatabase,
   teardownDatabase,
   createDBTransaction,
+  createCasinoDBTransaction,
   commitDBTransaction,
   rollbackDBTransaction,
   getBalanceOfUser,
