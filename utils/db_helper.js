@@ -11,9 +11,9 @@ const pool = new Pool({
     process.env.POSTGRES_DISABLE_SSL === 'true'
       ? false
       : {
-          rejectUnauthorized: false,
-          ca: fs.readFileSync(process.env.POSTGRES_CA).toString(),
-        },
+        rejectUnauthorized: false,
+        ca: fs.readFileSync(process.env.POSTGRES_CA).toString(),
+      },
 });
 
 const DIRECTION = {
