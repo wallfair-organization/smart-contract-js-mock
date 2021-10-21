@@ -37,6 +37,203 @@ test('Add Liquidity', async () => {
   );
 });
 
+test('Add Liquidity with hint, equal split, 4 outcomes', async () => {
+  const testBetId = String(Math.random());
+  const liquidityWalletId = String(Math.random());
+  const liquidity = 100000n * WFAIR.ONE;
+
+  // this hint is compatible with 25%:25%:25%:25%
+  const hint = [25n, 25n, 25n, 25n];
+
+  await WFAIR.mint(liquidityWalletId, liquidity);
+
+  const bet = new Bet(testBetId, 4);
+  await bet.addLiquidity(liquidityWalletId, liquidity, hint);
+
+  expect(await WFAIR.balanceOf(liquidityWalletId)).toBe(0n);
+  for (let o = 0; o < 4; o += 1) {
+    expect(await bet.getOutcomeToken(o).balanceOf(bet.walletId)).toBe(
+      liquidity
+    );
+    // all outcome tokens remain in the market
+    expect(await bet.getOutcomeToken(o).balanceOf(liquidityWalletId)).toBe(
+      0n
+    );
+  }
+});
+
+function probToHint(hintPercentages) {
+  // TODO: this imo should be a part of backend code, not smart contract mock
+  // the predicted probability of the outcome N to happen is
+  // (number of N outcome tokens in pool) / (sum (all outcome tokens in the pool))
+  // in case of binary market p = 1 - price (where price of YES option is NO/(YES+NO))
+  // hintPercentages a dictionary {outcome_idx: percentage (BigInt)}
+  const total = hintPercentages.reduce((p, c) => p + c, 0n);
+  if (total != 100n) {
+    // TODO: use other exception class here
+    throw new Error(`Percentages must sum to 100, received ${total}`);
+  }
+  // hints are used as proportions so percentages are as good as any other
+  return hintPercentages;
+}
+
+test('Add Liquidity with hint, non equal split, 3 outcomes', async () => {
+  const testBetId = String(Math.random())
+  const liquidityWalletId = String(Math.random());
+  // provide huge liquidity so there's almost no slippage
+  const liquidity = 224444n * WFAIR.ONE;
+
+  // probabilities are 25%:25%:50%
+  const hint = [liquidity / 2n, liquidity / 2n, liquidity];
+  // those hints have same effect (same proportions)
+  const hintPerc = probToHint([25n, 25n, 50n]);
+
+  await WFAIR.mint(liquidityWalletId, liquidity);
+
+  const bet = new Bet(testBetId, 3);
+  // set fee to 0 to not impact the prices
+  bet.fee = 0.0
+  await bet.addLiquidity(liquidityWalletId, liquidity, hintPerc);
+
+  const pricesRev = {};
+  for (let o = 0; o < 3; o += 1) {
+    // buy 1 WFAIR
+    const expectedOutcomeTokens = await bet.calcBuy(1n * WFAIR.ONE, o);
+    // price (denominated in WFAIR) is 1 WFAIR / expectedOutcomeTokens, use reverse
+    // because we have only integers
+    pricesRev[o] = expectedOutcomeTokens;
+    // console.log(`buy ${o} for 1n ${expectedOutcomeTokens} ${1 / Number(expectedOutcomeTokens)}`)
+  }
+  // prices of o 0 and 1 must be equal
+  expect(pricesRev[0]).toEqual(pricesRev[1]);
+  // prices of o 2 must be twice lower than o 0 (because it's 2x less probable)
+  // so reverse price must be 2x higher than o 0 price
+  expect(pricesRev[2] / 2n).toEqual(pricesRev[1]);
+
+  let totalOutcomeAmount = 0n
+  for (let o = 0; o < 3; o += 1) {
+    let inAMM = await bet.getOutcomeToken(o).balanceOf(bet.walletId);
+    expect(inAMM).toBe(hint[o]);
+    // rest of the outcome tokens sent back to the liquidity provider
+    // (mind that we always mint the `liquidity` amount of outcome tokens - for all outcomes)
+    expect(await bet.getOutcomeToken(o).balanceOf(liquidityWalletId)).toBe(
+      liquidity - inAMM
+    );
+    totalOutcomeAmount += inAMM;
+  }
+  // the option with max hint (50%) fully stays in the market, the other option
+  // are minted to `liquidity` and half is sent back to liquidity provider
+  expect(totalOutcomeAmount).toEqual(liquidity + 2n * liquidity / 2n);
+});
+
+test("Add liquidity, binary market 90%:10%", async () => {
+  const testBetId = String(Math.random());
+  const liquidityWalletId = String(Math.random());
+  // huge liquidity so there's almost no slippage
+  const liquidity = 1211231n * WFAIR.ONE;
+
+  // those hints have same effect (same proportions)
+  const hint = probToHint([90n, 10n]);
+
+  await WFAIR.mint(liquidityWalletId, liquidity);
+
+  const bet = new Bet(testBetId, 2);
+  // set fee to 0 to not impact the prices
+  bet.fee = 0;
+  await bet.addLiquidity(liquidityWalletId, liquidity, hint);
+
+  const pricesRev = {
+    0: await bet.calcBuy(1n * WFAIR.ONE, 0),
+    1: await bet.calcBuy(1n * WFAIR.ONE, 1),
+  };
+  // prices must be like in binary market
+  // YES price NO/(YES + NO) = NO/100 so rev 100/NO
+  // add 1 to correct for slippage
+  expect(pricesRev[0] + 1n).toEqual((100n * WFAIR.ONE / hint[1]))
+  // same for NO
+  expect(pricesRev[1]).toEqual((100n * WFAIR.ONE / hint[0]))
+});
+
+test("Add liqudity in active market should not change prices", async () => {
+  const testBetId = String(Math.random())
+  const liquidityWalletId = String(Math.random());
+  const liquidity = 1444n * WFAIR.ONE;
+
+  // those hints have same effect (same proportions)
+  const hintPerc = probToHint([35n, 25n, 40n]);
+
+  await WFAIR.mint(liquidityWalletId, liquidity);
+
+  const bet = new Bet(testBetId, 3);
+  bet.fee = 0.0
+  await bet.addLiquidity(liquidityWalletId, liquidity, hintPerc);
+
+  let pricesRev = {};
+  for (let o = 0; o < 3; o += 1) {
+    // buy 1 WFAIR
+    const expectedOutcomeTokens = await bet.calcBuy(1n * WFAIR.ONE, o);
+    // store prices for comparison
+    pricesRev[o] = expectedOutcomeTokens;
+  }
+
+  // provide a lot of liquidity, if it's not provided correctly that will disturb the prices
+  await WFAIR.mint(liquidityWalletId, 6251n * WFAIR.ONE);
+  // hints not allowed for established markets
+  // TODO: migrate from jest to chai before it's not too late, use chai-as-promise
+  // await expect(bet.addLiquidity(liquidityWalletId, 516251n * WFAIR.ONE, hintPerc)).to.eventually.be.rejectedWith(Error);
+  await bet.addLiquidity(liquidityWalletId, 6251n * WFAIR.ONE);
+  for (let o = 0; o < 3; o += 1) {
+    const expectedOutcomeTokens = await bet.calcBuy(1n * WFAIR.ONE, o);
+    // we increased liquidity so there's less slippage so we get more tokens now
+    expect(expectedOutcomeTokens).toBeGreaterThan(pricesRev[o]);
+    // still difference is insignificant for 1 WFAIR
+    expect(pricesRev[o] - expectedOutcomeTokens).toBeLessThan(10n);
+  }
+
+  // investors buy and change prices
+  const investorWalletId = String(Math.random());
+  await WFAIR.mint(investorWalletId, 1000000n * WFAIR.ONE);
+  await bet.buy(investorWalletId, 2121n * WFAIR.ONE, 0, 1n);
+  await bet.buy(investorWalletId, 1121n * WFAIR.ONE, 1, 1n);
+  await bet.buy(investorWalletId, 4611n * WFAIR.ONE, 2, 1n);
+
+  pricesRev = {};
+  for (let o = 0; o < 3; o += 1) {
+    const expectedOutcomeTokens = await bet.calcBuy(1n * WFAIR.ONE, o);
+    // console.log(`buy ${o} for 1n ${expectedOutcomeTokens} old ${pricesRev[o]}`)
+    pricesRev[o] = expectedOutcomeTokens;
+  }
+
+  // add liquidity again
+  await WFAIR.mint(liquidityWalletId, 126251n * WFAIR.ONE);
+  await bet.addLiquidity(liquidityWalletId, 126251n * WFAIR.ONE);
+  for (let o = 0; o < 3; o += 1) {
+    const expectedOutcomeTokens = await bet.calcBuy(1n * WFAIR.ONE, o);
+    expect(expectedOutcomeTokens).toBeGreaterThan(pricesRev[o]);
+    expect(pricesRev[o] - expectedOutcomeTokens).toBeLessThan(10n);
+  }
+});
+
+
+test("Cannot buy all outcome tokens", async () => {
+  const testBetId = String(Math.random())
+  const liquidityWalletId = String(Math.random());
+  const liquidity = 100n * WFAIR.ONE;
+
+  await WFAIR.mint(liquidityWalletId, liquidity);
+
+  const bet = new Bet(testBetId, 3);
+  await bet.addLiquidity(liquidityWalletId, liquidity);
+
+  const investorWalletId = String(Math.random());
+  await WFAIR.mint(investorWalletId, 1000000n * WFAIR.ONE);
+  await bet.buy(investorWalletId, 1000000n * WFAIR.ONE, 0, 1n);
+
+  const pools = await bet.getPoolBalances()
+  // at least 1 `wei` of token stays
+  expect(pools[`0_${testBetId}`]).toEqual(1n);
+});
+
 test('Resolve Bet', async () => {
   const testBetId = 'resolveBet';
   const betResolver = 'WallfairBetResolver';
@@ -471,5 +668,5 @@ test('Test Weird Jonas Case', async () => {
   await bet.getOutcomeToken(0).mint(bet.walletId, 2146490114n);
   await bet.getOutcomeToken(1).mint(bet.walletId, 2147480000n);
 
-  expect(await bet.calcSellFromAmount(989886n, 0)).toBe(490099n);
+  expect(await bet.calcSellFromAmount(989886n, 0)).toBe(490100n);
 });
