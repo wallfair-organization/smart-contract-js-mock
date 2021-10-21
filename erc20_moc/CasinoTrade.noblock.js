@@ -4,7 +4,6 @@ const bigDecimal = require('js-big-decimal');
 const {
   CASINO_TRADE_STATE,
   createDBTransaction,
-  createCasinoDBTransaction,
   rollbackDBTransaction,
   commitDBTransaction,
   insertCasinoTrade,
@@ -58,7 +57,7 @@ class CasinoTrade {
   };
 
   cashout = async (userWalletAddr, crashFactor, gameId) => {
-    const dbClient = await createCasinoDBTransaction();
+    const dbClient = await createDBTransaction();
 
     try {
       let res = await attemptCashout(dbClient, userWalletAddr, gameId, crashFactor);
