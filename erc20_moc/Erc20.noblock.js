@@ -102,20 +102,13 @@ class ERC20 {
         );
       }
 
-      const receiverBalanceRes = await updateBalanceOfUser(
+      await updateBalanceOfUser(
         dbClient,
         receiver,
         this.symbol,
         trx_time,
         amount
       );
-      const receiverBalance = this._balanceOf(receiver, receiverBalanceRes);
-
-      if (receiverBalance < 0n) {
-        throw new NoWeb3Exception(
-          `Receiver can't have balance below zero! Sender: ${sender} -- Receiver: ${receiver} -- receiverBalance: ${receiverBalance} -- amount: ${amount}`
-        );
-      }
 
       await insertTransaction(
         dbClient,
