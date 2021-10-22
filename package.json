@@ -15,7 +15,7 @@
     "lint:fix": "eslint --cache --c .eslintrc.js --ext .js --fix '.'",
     "test": "npm run test:unit",
     "test:unit": "jest -i --detectOpenHandles --passWithNoTests --forceExit",
-    "publish": "npm publish --access=public"
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "wallfair",
