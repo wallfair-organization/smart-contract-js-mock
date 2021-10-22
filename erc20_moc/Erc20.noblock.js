@@ -4,6 +4,7 @@ const {
   rollbackDBTransaction,
   insertTransaction,
   getBalanceOfUser,
+  getBalanceOfUserForUpdate,
   viewBalanceOfUser,
   updateBalanceOfUser,
 } = require('../utils/db_helper');
@@ -51,6 +52,19 @@ class ERC20 {
 
   /**
    * Check the token-balance of an address
+   * Build for Transactions while locking a row for modifying
+   *
+   * @param dbClient {Client}
+   * @param user {string}
+   * @returns {Promise<bigint>}
+   */
+  balanceOfChainForUpdate = async (dbClient, user) => {
+    const results = await getBalanceOfUserForUpdate(dbClient, user, this.symbol);
+    return this._balanceOf(user, results);
+  }
+
+  /**
+   * Check the token-balance of an address
    *
    * @param user {string}
    * @returns {Promise<bigint>}
@@ -72,38 +86,38 @@ class ERC20 {
    */
   transferChain = async (dbClient, sender, receiver, amount) => {
     if (amount >= 0n) {
-      const senderBalance = await this.balanceOfChain(dbClient, sender);
-      if (senderBalance >= amount) {
-        const trx_time = new Date();
-        const receiverBalance = await this.balanceOfChain(dbClient, receiver);
+      const trx_time = new Date();
+      const senderBalanceRes = await updateBalanceOfUser(
+        dbClient,
+        sender,
+        this.symbol,
+        trx_time,
+        -amount
+      );
+      const senderBalance = this._balanceOf(sender, senderBalanceRes);
 
-        await updateBalanceOfUser(
-          dbClient,
-          sender,
-          this.symbol,
-          trx_time,
-          senderBalance - amount
-        );
-        await updateBalanceOfUser(
-          dbClient,
-          receiver,
-          this.symbol,
-          trx_time,
-          receiverBalance + amount
-        );
-        await insertTransaction(
-          dbClient,
-          sender,
-          receiver,
-          amount,
-          this.symbol,
-          trx_time
-        );
-      } else {
+      if (senderBalance < 0n) {
         throw new NoWeb3Exception(
           `Sender can't spend more than it owns! Sender: ${sender} -- Receiver: ${receiver} -- senderBalance: ${senderBalance} -- amount: ${amount}`
         );
       }
+
+      await updateBalanceOfUser(
+        dbClient,
+        receiver,
+        this.symbol,
+        trx_time,
+        amount
+      );
+
+      await insertTransaction(
+        dbClient,
+        sender,
+        receiver,
+        amount,
+        this.symbol,
+        trx_time
+      );
     } else {
       throw new NoWeb3Exception(
         `Spending negative amounts is not possible! : ${sender} -- Receiver: ${receiver} -- amount: ${amount}`
@@ -142,14 +156,14 @@ class ERC20 {
   mintChain = async (dbClient, receiver, amount) => {
     if (amount >= 0n) {
       const trx_time = new Date();
-      const receiverBalance = await this.balanceOfChain(dbClient, receiver);
       await updateBalanceOfUser(
         dbClient,
         receiver,
         this.symbol,
         trx_time,
-        receiverBalance + amount
+        amount
       );
+
       await insertTransaction(
         dbClient,
         '',
@@ -193,28 +207,29 @@ class ERC20 {
   burnChain = async (dbClient, sponsor, amount) => {
     if (amount >= 0n) {
       const trx_time = new Date();
-      const balance = await this.balanceOfChain(dbClient, sponsor);
-      if (balance >= amount) {
-        await updateBalanceOfUser(
-          dbClient,
-          sponsor,
-          this.symbol,
-          trx_time,
-          balance - amount
-        );
-        await insertTransaction(
-          dbClient,
-          sponsor,
-          '',
-          amount,
-          this.symbol,
-          trx_time
-        );
-      } else {
+      const userBalanceRes = await updateBalanceOfUser(
+        dbClient,
+        sponsor,
+        this.symbol,
+        trx_time,
+        -amount
+      );
+      const userBalance = this._balanceOf(sponsor, userBalanceRes);
+
+      if (userBalance < 0n) {
         throw new NoWeb3Exception(
           `Owner can't burn more than it owns! -- Owner: ${sponsor} owns: ${balance} burns: ${amount}`
         );
       }
+
+      await insertTransaction(
+        dbClient,
+        sponsor,
+        '',
+        amount,
+        this.symbol,
+        trx_time
+      );
     } else {
       throw new NoWeb3Exception('Burning negative amounts is not possible!');
     }

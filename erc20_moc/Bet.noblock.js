@@ -712,7 +712,7 @@ class Bet {
    * @private
    */
   _payoutChain = async (dbClient, outcomeToken, beneficiary) => {
-    const outcomeBalance = await outcomeToken.balanceOfChain(dbClient, beneficiary);
+    const outcomeBalance = await outcomeToken.balanceOfChainForUpdate(dbClient, beneficiary);
     await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
     await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
 

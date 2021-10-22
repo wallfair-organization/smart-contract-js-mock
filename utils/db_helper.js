@@ -33,7 +33,6 @@ const CASINO_TRADE_STATE = {
 const BEGIN = 'BEGIN';
 const COMMIT = 'COMMIT';
 const ROLLBACK = 'ROLLBACK';
-const SET_ISOLATION_LEVEL = 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ';
 
 const CREATE_TOKEN_TRANSACTIONS =
   'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
@@ -56,6 +55,7 @@ const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
 
 const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
+const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2 FOR UPDATE;';
 const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
 const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
 const GET_LIMIT_BALANCE_OF_TOKEN =
@@ -76,7 +76,7 @@ const GET_BET_INVESTORS =
   'SELECT buyer, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, direction;';
 
 const UPDATE_BALANCE_OF_USER =
-  'INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = $4;';
+  'INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = token_balances.balance + $4 RETURNING balance;';
 const INSERT_TOKEN_TRANSACTION =
   'INSERT INTO token_transactions(sender, receiver, amount, symbol, trx_timestamp) VALUES($1, $2, $3, $4, $5);';
 const INSERT_AMM_INTERACTION =
@@ -93,18 +93,17 @@ const SET_CASINO_TRADE_OUTCOMES =
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameId = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
-  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 and userId = $5 RETURNING *;';
+  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameId = $3 AND state = $4 AND userId = $5 RETURNING *;';
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
-  outcomeindex,
-  avg(quote) as quote
-from amm_price_action
-where trx_timestamp > localtimestamp - interval '${interval2}' and betid = $3
-group by outcomeindex, trunc
-order by outcomeindex, trunc;`;
+    outcomeindex, avg(quote) as quote
+  from amm_price_action
+  where trx_timestamp > localtimestamp - interval '${interval2}' and betid = $3
+  group by outcomeindex, trunc
+  order by outcomeindex, trunc;`;
 const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
     where trx_timestamp = (
         select max(trx_timestamp)
@@ -147,7 +146,6 @@ async function teardownDatabase() {
 async function createDBTransaction() {
   const client = await getConnection();
   await client.query(BEGIN);
-  await client.query(SET_ISOLATION_LEVEL);
   return client;
 }
 
@@ -180,6 +178,20 @@ async function rollbackDBTransaction(client) {
  */
 async function getBalanceOfUser(client, user, symbol) {
   const res = await client.query(GET_BALANCE_OF_USER, [symbol, user]);
+  return res.rows;
+}
+
+/**
+ * Get the balance of a specific token from a user
+ * Build for Transactions while locking a row for modifying
+ *
+ * @param client {Client}
+ * @param user {String}
+ * @param symbol {String}
+ * @returns {Promise<*>}
+ */
+async function getBalanceOfUserForUpdate(client, user, symbol) {
+  const res = await client.query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user]);
   return res.rows;
 }
 
@@ -277,8 +289,9 @@ async function viewLimitBalancesOfToken(symbol, limit) {
  * @param newBalance {bigint}
  * @returns {Promise<void>}
  */
-async function updateBalanceOfUser(client, user, symbol, timestamp, newBalance) {
-  await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, newBalance]);
+async function updateBalanceOfUser(client, user, symbol, timestamp, amount) {
+  const res = await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, amount]);
+  return res.rows;
 }
 
 /**
@@ -637,6 +650,7 @@ module.exports = {
   commitDBTransaction,
   rollbackDBTransaction,
   getBalanceOfUser,
+  getBalanceOfUserForUpdate,
   viewBalanceOfUser,
   viewAMMInteractionsOfUser,
   getAllBalancesOfUser,
