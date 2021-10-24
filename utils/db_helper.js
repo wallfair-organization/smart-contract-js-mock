@@ -343,7 +343,7 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
  * @param {String} gameHash
  * @returns
  */
-async function attemptCashout(client, userwalletAddr, gameHash, crashFactor) {
+async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
   return await client.query(SET_CASINO_TRADE_STATE, [
     CASINO_TRADE_STATE.WIN,
     crashFactor,

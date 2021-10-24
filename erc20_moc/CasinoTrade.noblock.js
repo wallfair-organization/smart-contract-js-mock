@@ -60,10 +60,10 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      let res = await attemptCashout(dbClient, userWalletAddr, gameHash, crashFactor);
+      let res = await attemptCashout(dbClient, userWalletAddr, crashFactor, gameHash);
 
       if (res.rows.length == 0) {
-        throw 'Transaction did not succeed';
+        throw 'Transaction did not succeed: Bet was not found';
       }
 
       let totalReward = 0n;
