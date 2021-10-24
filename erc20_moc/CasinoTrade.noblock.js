@@ -90,6 +90,7 @@ class CasinoTrade {
         return { totalReward, stakedAmount };
       } else {
         await rollbackDBTransaction(dbClient);
+        throw `Total reward lower than 1: ${totalReward}`;
       }
     } catch (e) {
       await rollbackDBTransaction(dbClient);

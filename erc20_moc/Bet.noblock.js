@@ -18,6 +18,7 @@ const {
   getAmmPriceActions,
   getLatestPriceActions,
 } = require('../utils/db_helper');
+const { ceildiv } = require('../utils/utils');
 
 const COLLATERAL_TOKEN = 'WFAIR';
 const WALLET_PREFIX = 'BET_';
@@ -195,16 +196,59 @@ class Bet {
    *
    * @param provider {string}
    * @param amount {bigint}
+   * @param distributionHints {[bigint]}
    * @returns {Promise<void>}
    */
-  addLiquidity = async (provider, amount) => {
-    // TODO: this works only when market is empty and for 50:50 initial outcome probs, reimplement
+  addLiquidity = async (provider, amount, distributionHints) => {
     const dbClient = await createDBTransaction();
     try {
+      const poolBalances = await this.getPoolBalancesChain(dbClient);
+      const poolBalanceValues = Object.values(poolBalances);
+      const totalOutcomesAmount = poolBalanceValues.reduce((p, c) => p + c, 0n);
+      if (totalOutcomesAmount > 0 && distributionHints) {
+        throw new Error(`BET-ID: ${this.walletId}: distributionHint may be used only on empty market`);
+      }
+      // use initial hint if pool balances empty
+      const hints = totalOutcomesAmount > 0 ? poolBalanceValues : distributionHints;
+      let sendBacksAmounts;
+      if (hints) {
+        if (hints.length !== this.outcomes) {
+          throw new Error(`BET-ID: ${this.walletId}: number of hints ${hints.length} !== number of outcomes ${this.outcomes}`);
+        }
+        sendBacksAmounts = {}
+        // hint was present so calculate sendBacks
+        const maxHint = Object.values(hints).reduce((p, c) => c > p ? c : p, 0n);
+        if (maxHint === 0n) {
+          throw new Error(`BET-ID: ${this.walletId}: invalid distribution hint, max value is 0`);
+        }
+        for (let o = 0; o < hints.length; o += 1) {
+          const remaining = (amount * hints[o]) / maxHint;
+          if (remaining <= 0n) {
+            throw new Error(`BET-ID: ${this.walletId}: invalid distribution at outcome ${o} amount ${a}`);
+          }
+          sendBacksAmounts[o] = amount - remaining;
+          // console.log(`o: ${o} a: ${hints[o]} r: ${remaining} back: ${sendBacksAmounts[o]}`);
+        }
+      }
+      // TODO: implement a method to transfer several tokens in one call (like batch transfer)
+      // get the collateral from provides
       await this.collateralToken.transferChain(dbClient, provider, this.walletId, amount);
+
+      // always mint the `amount` of every outcome tokens
       const tokens = this.getOutcomeTokens();
       for (const token of tokens) {
         await token.mintChain(dbClient, this.walletId, amount);
+      }
+
+      // send back the tokens to make the market (new market) / keep the price constant (further adds)
+      if (sendBacksAmounts) {
+        for (const [o, a] of Object.entries(sendBacksAmounts)) {
+          if (a > 0n) {
+            const token = new ERC20(this.getOutcomeKey(o));
+            // console.log(`TX back ${o}: ${a}`);
+            await token.transferChain(dbClient, this.walletId, provider, a);
+          }
+        }
       }
 
       await commitDBTransaction(dbClient);
@@ -222,7 +266,7 @@ class Bet {
    * @private
    */
   _getFee = (amount) => {
-    return amount / BigInt(this.fee * 100) / 100n;
+    return this.fee === 0.0 ? 0n : amount / BigInt(this.fee * 100) / 100n;
   };
 
   /**
@@ -239,10 +283,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
 
@@ -256,11 +300,11 @@ class Bet {
       if (poolBalanceKey !== outcomeKey) {
         const poolBalance = poolBalances[poolBalanceKey];
         endingOutcomeBalance =
-          (endingOutcomeBalance * poolBalance) / (poolBalance + investmentAmountMinusFees);
+          ceildiv(endingOutcomeBalance * poolBalance, poolBalance + investmentAmountMinusFees);
       }
     }
     const outcomeTokensAmount =
-      buyTokenPoolBalance + investmentAmountMinusFees - endingOutcomeBalance / this.ONE;
+      buyTokenPoolBalance + investmentAmountMinusFees - ceildiv(endingOutcomeBalance, this.ONE);
     if (outcomeTokensAmount < 0) {
       throw new NoWeb3Exception(
         `Assert when buying: outcome token amount was negative: amount: ${investmentAmount} outcome: ${outcomeKey}`
@@ -309,10 +353,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
     const returnAmountPlusFees = returnAmount + this._getFee(returnAmount);
@@ -331,11 +375,11 @@ class Bet {
           );
         }
         endingOutcomeBalance =
-          (endingOutcomeBalance * poolBalance) / (poolBalance - returnAmountPlusFees);
+          ceildiv(endingOutcomeBalance * poolBalance, poolBalance - returnAmountPlusFees);
       }
     }
 
-    return returnAmountPlusFees + endingOutcomeBalance / this.ONE - sellTokenPoolBalance;
+    return returnAmountPlusFees + ceildiv(endingOutcomeBalance, this.ONE) - sellTokenPoolBalance;
   };
 
   /**
@@ -650,10 +694,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
     await insertReport(this.betId, reporter, outcome, new Date());
@@ -668,7 +712,7 @@ class Bet {
    * @private
    */
   _payoutChain = async (dbClient, outcomeToken, beneficiary) => {
-    const outcomeBalance = await outcomeToken.balanceOfChain(dbClient, beneficiary);
+    const outcomeBalance = await outcomeToken.balanceOfChainForUpdate(dbClient, beneficiary);
     await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
     await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
 
@@ -819,10 +863,10 @@ class Bet {
     if (outcome < 0 || outcome > this.outcomes) {
       throw new NoWeb3Exception(
         'The outcome needs to be int the range between 0 and ' +
-          this.outcomes +
-          ', but is "' +
-          outcome +
-          '"'
+        this.outcomes +
+        ', but is "' +
+        outcome +
+        '"'
       );
     }
 
