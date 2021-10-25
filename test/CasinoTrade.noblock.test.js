@@ -31,7 +31,7 @@ test('Run a game', async () => {
   }
 
   // lock the trades
-  await casino.lockOpenTrades('gameId');
+  await casino.lockOpenTrades('gameId', 'gameId', 3, 10000);
 
   // cashout
   for (let i = 1; i <= 5; i++) {
