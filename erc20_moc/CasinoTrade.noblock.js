@@ -43,11 +43,11 @@ class CasinoTrade {
     }
   };
 
-  lockOpenTrades = async (gameId) => {
+  lockOpenTrades = async (gameId, gameHash, crashFactor, gameLengthMS) => {
     const dbClient = await createDBTransaction();
 
     try {
-      await lockOpenCasinoTrades(dbClient, gameId);
+      await lockOpenCasinoTrades(dbClient, gameId, gameHash, crashFactor, gameLengthMS);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -56,14 +56,14 @@ class CasinoTrade {
     }
   };
 
-  cashout = async (userWalletAddr, crashFactor, gameId) => {
+  cashout = async (userWalletAddr, crashFactor, gameHash) => {
     const dbClient = await createDBTransaction();
 
     try {
-      let res = await attemptCashout(dbClient, userWalletAddr, gameId, crashFactor);
+      let res = await attemptCashout(dbClient, userWalletAddr, crashFactor, gameHash);
 
       if (res.rows.length == 0) {
-        throw 'Transaction did not succeed';
+        throw 'Transaction did not succeed: Bet was not found';
       }
 
       let totalReward = 0n;
@@ -98,15 +98,15 @@ class CasinoTrade {
     }
   };
 
-  rewardWinners = async (gameId, decidedCrashFactor) => {
+  rewardWinners = async (gameHash, decidedCrashFactor) => {
     const dbClient = await createDBTransaction();
 
     try {
-      let result = await setCasinoTradeOutcomes(dbClient, gameId, decidedCrashFactor);
+      let result = await setCasinoTradeOutcomes(dbClient, gameHash, decidedCrashFactor);
       let winners = result.rows;
       /*let winners = await getCasinoTrades(
         dbClient,
-        gameId,
+        gameHash,
         CASINO_TRADE_STATE.WIN
       );*/
       for (let winner of winners) {
