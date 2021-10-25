@@ -12,6 +12,7 @@ const {
   // getCasinoTrades,
   attemptCashout,
   getCasinoTradesByUserAndStates,
+  cancelCasinoTrade
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -35,6 +36,26 @@ class CasinoTrade {
         stakedAmount
       );
       await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount);
+
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+  cancelTrade = async (userWalletAddr, openTrade) => {
+    const dbClient = await createDBTransaction();
+
+    try {
+      // reverse actions in placeTrade
+      await this.WFAIRToken.transferChain(
+        dbClient,
+        this.casinoWalletAddr,
+        userWalletAddr,
+        openTrade.stakedAmount
+      );
+      await cancelCasinoTrade(dbClient, userWalletAddr);
 
       await commitDBTransaction(dbClient);
     } catch (e) {

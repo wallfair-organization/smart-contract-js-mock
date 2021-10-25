@@ -28,6 +28,7 @@ const CASINO_TRADE_STATE = {
   LOCKED: 1,
   WIN: 2,
   LOSS: 3,
+  CANCELED: 4
 };
 
 const BEGIN = 'BEGIN';
@@ -99,6 +100,8 @@ const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameHash = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND state = $4 AND userId = $5 RETURNING *;';
+const CANCEL_CASINO_TRADE =
+  `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.CANCELED} WHERE id = $1 RETURNING *;`;
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 
@@ -332,6 +335,19 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
     crashFactor,
     stakedAmount,
     CASINO_TRADE_STATE.OPEN,
+  ]);
+}
+
+/**
+ * Reverts INSERT_CASINO_TRADE
+ * Meant to be used inside a transaction together with a balance
+ *
+ * @param client {Client}
+ * @param tradeId  {String}
+ */
+async function cancelCasinoTrade(client, tradeId) {
+  return await client.query(CANCEL_CASINO_TRADE, [
+    tradeId
   ]);
 }
 
@@ -686,4 +702,5 @@ module.exports = {
   attemptCashout,
   getAmmPriceActions,
   getLatestPriceActions,
+  cancelCasinoTrade
 };
