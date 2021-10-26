@@ -116,7 +116,8 @@ const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 LIMIT $2 OFFSET ($2*$3) ORDER BY created_at DESC';
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
-
+const GET_CASINO_MATCH_BY_GAME_HASH =
+  'SELECT * FROM casino_matches WHERE gamehash = $1'
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
     outcomeindex, avg(quote) as quote
@@ -745,7 +746,7 @@ async function getMatches(page = 1, perPage= 10, gameId = process.env.GAME_ID){
  * Get matches
  * PostgreSQL interval
  *
- * @param matchId {String}
+ * @param matchId {Number}
  *
  */
 async function getMatchById(matchId){
@@ -753,8 +754,18 @@ async function getMatchById(matchId){
   return res.rows[0];
 }
 
-
-
+/**
+ * Get matches
+ * PostgreSQL interval
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getMatchByGameHash(gameHash){
+  const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  if(res.rows.length) return res.rows[0].id;
+  throw new Error('Match not found')
+}
 
 
 module.exports = {
@@ -805,5 +816,6 @@ module.exports = {
   getHighBetsInInterval,
   getCashedOutBets,
   getCurrentBets,
-  getUpcomingBets
+  getUpcomingBets,
+  getMatchByGameHash
 };

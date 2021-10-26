@@ -19,7 +19,8 @@ const {
   getLuckyBetsInInterval,
   getHighBetsInInterval,
   getMatches,
-  getMatchById
+  getMatchById,
+  getMatchByGameHash
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -159,7 +160,13 @@ class CasinoTrade {
   getCasinoTradesByUserIdAndStates = async (userId, states) =>
     await getCasinoTradesByUserAndStates(userId, states);
 
-  getBets = async (matchId) => {
+  getBets = async (gameHash) => {
+    if(!gameHash){
+      const upcomingBets = await getUpcomingBets()
+      return {cashedOutBets: [], upcomingBets, currentBets: []}
+    }
+
+    const matchId = await getMatchByGameHash(gameHash)
     const cashedOutBets = await getCashedOutBets(matchId)
     const upcomingBets = await getUpcomingBets()
     const currentBets = await getCurrentBets(matchId)
