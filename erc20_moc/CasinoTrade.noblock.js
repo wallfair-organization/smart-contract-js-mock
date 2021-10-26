@@ -12,7 +12,14 @@ const {
   // getCasinoTrades,
   attemptCashout,
   getCasinoTradesByUserAndStates,
-  cancelCasinoTrade
+  cancelCasinoTrade,
+  getCashedOutBets,
+  getUpcomingBets,
+  getCurrentBets,
+  getLuckyBetsInInterval,
+  getHighBetsInInterval,
+  getMatches,
+  getMatchById
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -46,16 +53,15 @@ class CasinoTrade {
 
   cancelTrade = async (userWalletAddr, openTrade) => {
     const dbClient = await createDBTransaction();
-
     try {
       // reverse actions in placeTrade
       await this.WFAIRToken.transferChain(
         dbClient,
         this.casinoWalletAddr,
         userWalletAddr,
-        openTrade.stakedAmount
+        parseInt(openTrade.stakedamount)
       );
-      await cancelCasinoTrade(dbClient, userWalletAddr);
+      await cancelCasinoTrade(dbClient, openTrade.id);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -152,6 +158,23 @@ class CasinoTrade {
 
   getCasinoTradesByUserIdAndStates = async (userId, states) =>
     await getCasinoTradesByUserAndStates(userId, states);
+
+  getBets = async (matchId) => {
+    const cashedOutBets = await getCashedOutBets(matchId)
+    const upcomingBets = await getUpcomingBets()
+    const currentBets = await getCurrentBets(matchId)
+
+    return {cashedOutBets, upcomingBets, currentBets}
+  }
+
+  getLuckyWins = async () => await getLuckyBetsInInterval('24 hours')
+
+  getHighWins = async () => await getHighBetsInInterval('24 hours')
+
+  getMatches = async () => await getMatches()
+
+  getMatch = async (matchId) => getMatchById(matchId)
+
 }
 
 module.exports = CasinoTrade;

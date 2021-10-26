@@ -104,6 +104,18 @@ const CANCEL_CASINO_TRADE =
   `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.CANCELED} WHERE id = $1 RETURNING *;`;
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
+const GET_CASINO_TRADES_BY_PERIOD =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval '$1 hours' ORDER BY $2 DESC`
+const GET_HIGH_CASINO_TRADES_BY_PERIOD =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY crashfactor DESC LIMIT $2`
+const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
+  `SELECT * FROM casino_trades WHERE state = $1 AND game_match ${p2 ? '= $2' : 'IS NULL'}`;
+const GET_CASINO_MATCHES =
+  'SELECT * FROM casino_matches WHERE gameid = $1 LIMIT $2 OFFSET ($2*$3) ORDER BY created_at DESC';
+const GET_CASINO_MATCH_BY_ID =
+  'SELECT * FROM casino_matches WHERE id = $1'
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -661,6 +673,90 @@ async function getLatestPriceActions(betId) {
   return res.rows;
 }
 
+/**
+ * Get upcoming bets (open bets)
+ */
+async function getUpcomingBets(){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
+  return res.rows;
+}
+
+/**
+ * Get current bets
+ *
+ * @param matchId {Number}
+ *
+ */
+async function getCurrentBets(matchId){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, matchId), [CASINO_TRADE_STATE.LOCKED, matchId])
+  return res.rows;
+}
+
+/**
+ * Get cashed out (winning) bets
+ *
+ * @param matchId {Number}
+ *
+ */
+async function getCashedOutBets(matchId){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, matchId), [CASINO_TRADE_STATE.WIN, matchId])
+  return res.rows;
+}
+
+/**
+ * Get high bets (highest amount won)
+ * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
+ * @param interval {String}
+ * @param limit {Number}
+ *
+ */
+async function getHighBetsInInterval(interval = '24 hours', limit = 100){
+  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
+  return res.rows;
+}
+
+/**
+ * Get lucky bets (highest crash factor)
+ * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
+ * @param interval {String}
+ * @param limit {Number}
+ *
+ */
+async function getLuckyBetsInInterval(interval = '24 hours', limit = 100){
+  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
+  return res.rows;
+}
+
+/**
+ * Get matches
+ * PostgreSQL interval
+ *
+ * @param page {Number}
+ * @param perPage {Number}
+ * @param gameId {String}
+ *
+ */
+async function getMatches(page = 1, perPage= 10, gameId = process.env.GAME_ID){
+  const res = await pool.query(GET_CASINO_MATCHES, [gameId, perPage, page])
+  return res.rows;
+}
+
+/**
+ * Get matches
+ * PostgreSQL interval
+ *
+ * @param matchId {String}
+ *
+ */
+async function getMatchById(matchId){
+  const res = await pool.query(GET_CASINO_MATCH_BY_ID, [matchId])
+  return res.rows[0];
+}
+
+
+
+
+
 module.exports = {
   pool,
   DIRECTION,
@@ -702,5 +798,12 @@ module.exports = {
   attemptCashout,
   getAmmPriceActions,
   getLatestPriceActions,
-  cancelCasinoTrade
+  cancelCasinoTrade,
+  getMatchById,
+  getMatches,
+  getLuckyBetsInInterval,
+  getHighBetsInInterval,
+  getCashedOutBets,
+  getCurrentBets,
+  getUpcomingBets
 };
