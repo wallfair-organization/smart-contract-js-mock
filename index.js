@@ -4,7 +4,9 @@ const Erc20 = require('./erc20_moc/Erc20.noblock');
 const Leaderboard = require('./erc20_moc/Leaderboard.noblock');
 const Wallet = require('./erc20_moc/Wallet.noblock');
 const NoWeb3Exception = require('./erc20_moc/Exception.noblock');
-const { pool } = require('./utils/db_helper');
+const { pool,
+  CASINO_TRADE_STATE
+} = require('./utils/db_helper');
 
 module.exports = {
   pool,
@@ -14,4 +16,5 @@ module.exports = {
   Leaderboard,
   Wallet,
   NoWeb3Exception,
+  CASINO_TRADE_STATE
 };

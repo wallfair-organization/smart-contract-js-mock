@@ -28,6 +28,7 @@ const CASINO_TRADE_STATE = {
   LOCKED: 1,
   WIN: 2,
   LOSS: 3,
+  CANCELED: 4
 };
 
 const BEGIN = 'BEGIN';
@@ -99,8 +100,39 @@ const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameHash = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND state = $4 AND userId = $5 RETURNING *;';
+const CANCEL_CASINO_TRADE =
+  `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.CANCELED} WHERE id = $1 RETURNING *;`;
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
+const GET_CASINO_TRADES_BY_PERIOD =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval '$1 hours' ORDER BY $2 DESC`
+const GET_HIGH_CASINO_TRADES_BY_PERIOD =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY crashfactor DESC LIMIT $2`
+const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
+  `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
+const GET_CASINO_MATCHES =
+  'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
+const GET_CASINO_MATCH_BY_ID =
+  'SELECT * FROM casino_matches WHERE id = $1'
+const GET_CASINO_MATCH_BY_GAME_HASH =
+  'SELECT * FROM casino_matches WHERE gamehash = $1'
+
+const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
+  `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at`;
+const UPDATE_CASINO_MATCHES_MISSING_VALUES =
+  `UPDATE casino_matches cm
+   SET amountinvestedsum=amountinvestedsum_query.total,
+       amountrewardedsum=amountrewardedsum_query.total,
+       numtrades=numtrades_query.total,
+       numcashouts=numcashouts_query.total
+   FROM
+     (SELECT SUM(stakedamount) as total from casino_trades ct where ct.gamehash=$1) AS amountinvestedsum_query,
+     (SELECT COALESCE(sum(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash=$1) AS amountrewardedsum_query,
+     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1) AS numtrades_query,
+     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1 and ct.state=2) AS numcashouts_query
+   WHERE cm.gamehash=$1`;
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -332,6 +364,19 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
     crashFactor,
     stakedAmount,
     CASINO_TRADE_STATE.OPEN,
+  ]);
+}
+
+/**
+ * Reverts INSERT_CASINO_TRADE
+ * Meant to be used inside a transaction together with a balance
+ *
+ * @param client {Client}
+ * @param tradeId  {String}
+ */
+async function cancelCasinoTrade(client, tradeId) {
+  return await client.query(CANCEL_CASINO_TRADE, [
+    tradeId
   ]);
 }
 
@@ -645,6 +690,137 @@ async function getLatestPriceActions(betId) {
   return res.rows;
 }
 
+/**
+ * Get upcoming bets (open bets)
+ */
+async function getUpcomingBets(){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
+  return res.rows;
+}
+
+/**
+ * Get current bets
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getCurrentBets(gameHash){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
+  return res.rows;
+}
+
+/**
+ * Get cashed out (winning) bets
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getCashedOutBets(gameHash){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  return res.rows;
+}
+
+/**
+ * Get lost bets
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getLostBets(gameHash){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  return res.rows;
+}
+
+
+
+/**
+ * Get high bets (highest amount won)
+ * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
+ * @param interval {String}
+ * @param limit {Number}
+ *
+ */
+async function getHighBetsInInterval(interval = '24 hours', limit = 100){
+  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
+  return res.rows;
+}
+
+/**
+ * Get lucky bets (highest crash factor)
+ * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
+ * @param interval {String}
+ * @param limit {Number}
+ *
+ */
+async function getLuckyBetsInInterval(interval = '24 hours', limit = 100){
+  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
+  return res.rows;
+}
+
+/**
+ * Get matches
+ * PostgreSQL interval
+ *
+ * @param page {Number}
+ * @param perPage {Number}
+ * @param gameId {String}
+ *
+ */
+async function getMatches(page = 1, perPage= 10, gameId = process.env.GAME_ID){
+  const res = await pool.query(GET_CASINO_MATCHES, [gameId, perPage, page])
+  return res.rows;
+}
+
+/**
+ * Get matches
+ * PostgreSQL interval
+ *
+ * @param matchId {Number}
+ *
+ */
+async function getMatchById(matchId){
+  const res = await pool.query(GET_CASINO_MATCH_BY_ID, [matchId])
+  return res.rows[0];
+}
+
+/**
+ * Get matches
+ * PostgreSQL interval
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getMatchByGameHash(gameHash){
+  const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  if(res.rows.length) return res.rows[0].id;
+  throw new Error('Match not found')
+}
+
+/**
+ * get matches for update missing values for past games, only when some trades are available by game_id
+ * PostgreSQL
+ *
+ * @param limit {Number}
+ *
+ */
+async function getMatchesForUpdateMissingValues() {
+  const res = await pool.query(GET_CASINO_MATCHES_EXISTING_IN_TRADES, [])
+  return res.rows;
+}
+
+/**
+ * update missing values for past game, per gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ *
+ */
+async function updateMatchesMissingValues(gameHash) {
+  const res = await pool.query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
+  return res.rows;
+}
+
+
 module.exports = {
   pool,
   DIRECTION,
@@ -686,4 +862,15 @@ module.exports = {
   attemptCashout,
   getAmmPriceActions,
   getLatestPriceActions,
+  cancelCasinoTrade,
+  getMatchById,
+  getMatches,
+  getLuckyBetsInInterval,
+  getHighBetsInInterval,
+  getCashedOutBets,
+  getCurrentBets,
+  getUpcomingBets,
+  getMatchByGameHash,
+  getMatchesForUpdateMissingValues,
+  updateMatchesMissingValues
 };

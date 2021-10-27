@@ -12,6 +12,17 @@ const {
   // getCasinoTrades,
   attemptCashout,
   getCasinoTradesByUserAndStates,
+  cancelCasinoTrade,
+  getCashedOutBets,
+  getUpcomingBets,
+  getCurrentBets,
+  getLuckyBetsInInterval,
+  getHighBetsInInterval,
+  getMatches,
+  getMatchById,
+  getMatchByGameHash,
+  getMatchesForUpdateMissingValues,
+  updateMatchesMissingValues
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -35,6 +46,25 @@ class CasinoTrade {
         stakedAmount
       );
       await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount);
+
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+  cancelTrade = async (userWalletAddr, openTrade) => {
+    const dbClient = await createDBTransaction();
+    try {
+      // reverse actions in placeTrade
+      await this.WFAIRToken.transferChain(
+        dbClient,
+        this.casinoWalletAddr,
+        userWalletAddr,
+        parseInt(openTrade.stakedamount)
+      );
+      await cancelCasinoTrade(dbClient, openTrade.id);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -131,6 +161,32 @@ class CasinoTrade {
 
   getCasinoTradesByUserIdAndStates = async (userId, states) =>
     await getCasinoTradesByUserAndStates(userId, states);
+
+  getBets = async (gameHash) => {
+    if(!gameHash){
+      const upcomingBets = await getUpcomingBets()
+      return {cashedOutBets: [], upcomingBets, currentBets: []}
+    }
+
+    const cashedOutBets = await getCashedOutBets(gameHash)
+    const upcomingBets = await getUpcomingBets()
+    const currentBets = await getCurrentBets(gameHash)
+
+    return {cashedOutBets, upcomingBets, currentBets}
+  }
+
+  getLuckyWins = async () => await getLuckyBetsInInterval('24 hours')
+
+  getHighWins = async () => await getHighBetsInInterval('24 hours')
+
+  getMatches = async () => await getMatches()
+
+  getMatch = async (matchId) => getMatchById(matchId)
+
+  getMatchesForUpdateMissingValues = async () => getMatchesForUpdateMissingValues()
+
+  updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
+
 }
 
 module.exports = CasinoTrade;
