@@ -181,6 +181,8 @@ class CasinoTrade {
 
   getMatch = async (matchId) => getMatchById(matchId)
 
+  getMatchByHash = async (gameHash) => getMatchByGameHash(gameHash)
+
 }
 
 module.exports = CasinoTrade;
