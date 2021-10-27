@@ -166,10 +166,9 @@ class CasinoTrade {
       return {cashedOutBets: [], upcomingBets, currentBets: []}
     }
 
-    const matchId = await getMatchByGameHash(gameHash)
-    const cashedOutBets = await getCashedOutBets(matchId)
+    const cashedOutBets = await getCashedOutBets(gameHash)
     const upcomingBets = await getUpcomingBets()
-    const currentBets = await getCurrentBets(matchId)
+    const currentBets = await getCurrentBets(gameHash)
 
     return {cashedOutBets, upcomingBets, currentBets}
   }

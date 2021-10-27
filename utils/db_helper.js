@@ -111,7 +111,7 @@ const GET_HIGH_CASINO_TRADES_BY_PERIOD =
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
-  `SELECT * FROM casino_trades WHERE state = $1 AND game_match ${p2 ? '= $2' : 'IS NULL'}`;
+  `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 LIMIT $2 OFFSET ($2*$3) ORDER BY created_at DESC';
 const GET_CASINO_MATCH_BY_ID =
@@ -685,24 +685,37 @@ async function getUpcomingBets(){
 /**
  * Get current bets
  *
- * @param matchId {Number}
+ * @param gameHash {String}
  *
  */
-async function getCurrentBets(matchId){
-  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, matchId), [CASINO_TRADE_STATE.LOCKED, matchId])
+async function getCurrentBets(gameHash){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
   return res.rows;
 }
 
 /**
  * Get cashed out (winning) bets
  *
- * @param matchId {Number}
+ * @param gameHash {String}
  *
  */
-async function getCashedOutBets(matchId){
-  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, matchId), [CASINO_TRADE_STATE.WIN, matchId])
+async function getCashedOutBets(gameHash){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
+
+/**
+ * Get cashed out (winning) bets
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getLostBets(gameHash){
+  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  return res.rows;
+}
+
+
 
 /**
  * Get high bets (highest amount won)
