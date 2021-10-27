@@ -113,7 +113,7 @@ const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_CASINO_MATCHES =
-  'SELECT * FROM casino_matches WHERE gameid = $1 LIMIT $2 OFFSET ($2*$3) ORDER BY created_at DESC';
+  'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
