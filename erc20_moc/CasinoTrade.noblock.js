@@ -185,7 +185,7 @@ class CasinoTrade {
 
   getMatchesForUpdateMissingValues = async () => getMatchesForUpdateMissingValues()
 
-  updateMatchesMissingValues = async () => updateMatchesMissingValues()
+  updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
 
 }
 

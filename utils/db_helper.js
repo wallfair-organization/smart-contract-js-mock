@@ -128,11 +128,11 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
        numtrades=numtrades_query.total,
        numcashouts=numcashouts_query.total
    FROM
-     (SELECT SUM(stakedamount) as total from casino_trades ct where ct.gamehash='$1') AS amountinvestedsum_query,
-     (SELECT COALESCE(sum(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash='$1') AS amountrewardedsum_query,
-     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash='$1') AS numtrades_query,
-     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash='$1' and ct.state=2) AS numcashouts_query
-   WHERE cm.gamehash='$1'`;
+     (SELECT SUM(stakedamount) as total from casino_trades ct where ct.gamehash=$1) AS amountinvestedsum_query,
+     (SELECT COALESCE(sum(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash=$1) AS amountrewardedsum_query,
+     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1) AS numtrades_query,
+     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1 and ct.state=2) AS numcashouts_query
+   WHERE cm.gamehash=$1`;
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
