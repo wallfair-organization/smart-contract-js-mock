@@ -118,6 +118,22 @@ const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
   'SELECT * FROM casino_matches WHERE gamehash = $1'
+
+const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
+  `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at`;
+const UPDATE_CASINO_MATCHES_MISSING_VALUES =
+  `UPDATE casino_matches cm
+   SET amountinvestedsum=amountinvestedsum_query.total,
+       amountrewardedsum=amountrewardedsum_query.total,
+       numtrades=numtrades_query.total,
+       numcashouts=numcashouts_query.total
+   FROM
+     (SELECT SUM(stakedamount) as total from casino_trades ct where ct.gamehash='$1') AS amountinvestedsum_query,
+     (SELECT COALESCE(sum(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash='$1') AS amountrewardedsum_query,
+     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash='$1') AS numtrades_query,
+     (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash='$1' and ct.state=2) AS numcashouts_query
+   WHERE cm.gamehash='$1'`;
+
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
     outcomeindex, avg(quote) as quote
@@ -780,6 +796,30 @@ async function getMatchByGameHash(gameHash){
   throw new Error('Match not found')
 }
 
+/**
+ * get matches for update missing values for past games, only when some trades are available by game_id
+ * PostgreSQL
+ *
+ * @param limit {Number}
+ *
+ */
+async function getMatchesForUpdateMissingValues() {
+  const res = await pool.query(GET_CASINO_MATCHES_EXISTING_IN_TRADES, [])
+  return res.rows;
+}
+
+/**
+ * update missing values for past game, per gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ *
+ */
+async function updateMatchesMissingValues(gameHash) {
+  const res = await pool.query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
+  return res.rows;
+}
+
 
 module.exports = {
   pool,
@@ -830,5 +870,7 @@ module.exports = {
   getCashedOutBets,
   getCurrentBets,
   getUpcomingBets,
-  getMatchByGameHash
+  getMatchByGameHash,
+  getMatchesForUpdateMissingValues,
+  updateMatchesMissingValues
 };
