@@ -179,13 +179,15 @@ class CasinoTrade {
 
   getHighWins = async () => await getHighBetsInInterval('24 hours')
 
-  getMatches = async () => await getMatches()
+  getMatches = async (page, perPage, gameId) => await getMatches(page, perPage, gameId)
 
   getMatch = async (matchId) => getMatchById(matchId)
 
+  getMatchByHash = async (gameHash) => getMatchByGameHash(gameHash)
   getMatchesForUpdateMissingValues = async () => getMatchesForUpdateMissingValues()
 
   updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
+
 
 }
 
