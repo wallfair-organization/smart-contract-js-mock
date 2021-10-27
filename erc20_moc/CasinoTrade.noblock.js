@@ -20,7 +20,9 @@ const {
   getHighBetsInInterval,
   getMatches,
   getMatchById,
-  getMatchByGameHash
+  getMatchByGameHash,
+  getMatchesForUpdateMissingValues,
+  updateMatchesMissingValues
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -182,6 +184,10 @@ class CasinoTrade {
   getMatch = async (matchId) => getMatchById(matchId)
 
   getMatchByHash = async (gameHash) => getMatchByGameHash(gameHash)
+  getMatchesForUpdateMissingValues = async () => getMatchesForUpdateMissingValues()
+
+  updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
+
 
 }
 
