@@ -705,7 +705,7 @@ async function getCashedOutBets(gameHash){
 }
 
 /**
- * Get cashed out (winning) bets
+ * Get lost bets
  *
  * @param gameHash {String}
  *
