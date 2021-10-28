@@ -107,9 +107,9 @@ const GET_CASINO_TRADES_BY_USER_AND_STATES =
 const GET_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval '$1 hours' ORDER BY $2 DESC`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY crashfactor DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_CASINO_MATCHES =
@@ -743,7 +743,7 @@ async function getLostBets(gameHash){
  * @param limit {Number}
  *
  */
-async function getHighBetsInInterval(interval = '24 hours', limit = 100){
+async function getHighBetsInInterval(interval = 24, limit = 100){
   const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
   return res.rows;
 }
@@ -755,7 +755,7 @@ async function getHighBetsInInterval(interval = '24 hours', limit = 100){
  * @param limit {Number}
  *
  */
-async function getLuckyBetsInInterval(interval = '24 hours', limit = 100){
+async function getLuckyBetsInInterval(interval = 24, limit = 100){
   const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
   return res.rows;
 }

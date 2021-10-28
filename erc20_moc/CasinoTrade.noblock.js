@@ -176,9 +176,9 @@ class CasinoTrade {
     return {cashedOutBets, upcomingBets, currentBets}
   }
 
-  getLuckyWins = async () => await getLuckyBetsInInterval('24 hours')
+  getLuckyWins = async (lastHours, limit) => await getLuckyBetsInInterval(lastHours, limit)
 
-  getHighWins = async () => await getHighBetsInInterval('24 hours')
+  getHighWins = async (lastHours, limit) => await getHighBetsInInterval(lastHours, limit)
 
   getMatches = async (page, perPage, gameId) => await getMatches(page, perPage, gameId)
 
