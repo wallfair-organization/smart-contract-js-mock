@@ -792,7 +792,7 @@ async function getMatchById(matchId){
  */
 async function getMatchByGameHash(gameHash){
   const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
-  if(res.rows.length) return res.rows[0].id;
+  if(res.rows.length) return res.rows[0];
   throw new Error('Match not found')
 }
 
