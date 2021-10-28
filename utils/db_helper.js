@@ -135,7 +135,7 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
    WHERE cm.gamehash=$1`;
 
 const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
-  `SELECT date_trunc('day', ct.created_at) "day", count(1) AS total_played FROM casino_trades ct WHERE ct.userid=$1 and ct.created_at >= CURRENT_TIMESTAMP - interval '$2 days' GROUP BY 1;`
+  `SELECT date_trunc('day', ct.created_at) "day", count(1) AS total_played FROM casino_trades ct WHERE ct.userid = $1 and ct.created_at >= CURRENT_TIMESTAMP - $2 * INTERVAL '1 day' GROUP BY 1;`
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -824,15 +824,15 @@ async function updateMatchesMissingValues(gameHash) {
 }
 
 /**
- * check if user by id played X days in a row, return [day, total_played] columns, grouped by day
+ * check if user by id played X days in a row (default 6), return [day, total_played] columns, grouped by day
  * PostgreSQL
  *
  * @param userId {String}
  * @param lastDays {Number}
  *
  */
-async function getUserPlayedLastXDaysInRow(userId, lastDays) {
-  const res = await pool.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays])
+async function getUserPlayedLastXDaysInRow(userId, lastDays= 6) {
+  const res = await pool.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
   return res.rows;
 }
 
