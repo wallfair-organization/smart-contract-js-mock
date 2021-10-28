@@ -22,7 +22,8 @@ const {
   getMatchById,
   getMatchByGameHash,
   getMatchesForUpdateMissingValues,
-  updateMatchesMissingValues
+  updateMatchesMissingValues,
+  getUserPlayedLastXDaysInRow
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -188,6 +189,7 @@ class CasinoTrade {
 
   updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
 
+  getUserPlayedLastXDaysInRow = async (userId, lastDays) => getUserPlayedLastXDaysInRow(userId, lastDays)
 
 }
 
