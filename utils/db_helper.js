@@ -120,7 +120,7 @@ const GET_CASINO_MATCH_BY_GAME_HASH =
   'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
-  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id ORDER BY ID asc limit 1;`
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
 const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
 
@@ -803,8 +803,7 @@ async function getMatchById(matchId){
  */
 async function getMatchByGameHash(gameHash){
   const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
-  if(res.rows.length) return res.rows[0];
-  throw new Error('Match not found')
+  return res.rows;
 }
 
 
