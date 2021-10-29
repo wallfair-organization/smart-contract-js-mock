@@ -22,7 +22,11 @@ const {
   getMatchById,
   getMatchByGameHash,
   getMatchesForUpdateMissingValues,
-  updateMatchesMissingValues
+  updateMatchesMissingValues,
+  getUserPlayedLastXDaysInRow,
+  getAllTradesByGameHash,
+  getNextMatchByGameHash,
+  getPrevMatchByGameHash
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -175,9 +179,9 @@ class CasinoTrade {
     return {cashedOutBets, upcomingBets, currentBets}
   }
 
-  getLuckyWins = async () => await getLuckyBetsInInterval('24 hours')
+  getLuckyWins = async (lastHours, limit) => await getLuckyBetsInInterval(lastHours, limit)
 
-  getHighWins = async () => await getHighBetsInInterval('24 hours')
+  getHighWins = async (lastHours, limit) => await getHighBetsInInterval(lastHours, limit)
 
   getMatches = async (page, perPage, gameId) => await getMatches(page, perPage, gameId)
 
@@ -188,6 +192,12 @@ class CasinoTrade {
 
   updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
 
+  getUserPlayedLastXDaysInRow = async (userId, lastDays) => getUserPlayedLastXDaysInRow(userId, lastDays)
+
+  getAllTradesByGameHash = async (gameHash) => getAllTradesByGameHash(gameHash)
+
+  getNextMatchByGameHash = async (gameHash) => getNextMatchByGameHash(gameHash)
+  getPrevMatchByGameHash = async (gameHash) => getPrevMatchByGameHash(gameHash)
 
 }
 

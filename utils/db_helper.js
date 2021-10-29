@@ -107,9 +107,9 @@ const GET_CASINO_TRADES_BY_USER_AND_STATES =
 const GET_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval '$1 hours' ORDER BY $2 DESC`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval $1 AND state=2 ORDER BY crashfactor DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_CASINO_MATCHES =
@@ -117,7 +117,12 @@ const GET_CASINO_MATCHES =
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
-  'SELECT * FROM casino_matches WHERE gamehash = $1'
+  'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
+
+const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
+const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
   `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at`;
@@ -133,6 +138,12 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
      (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1) AS numtrades_query,
      (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1 and ct.state=2) AS numcashouts_query
    WHERE cm.gamehash=$1`;
+
+const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
+  `SELECT date_trunc('day', ct.created_at) "day", count(1) AS total_played FROM casino_trades ct WHERE ct.userid = $1 and ct.created_at >= CURRENT_TIMESTAMP - $2 * INTERVAL '1 day' GROUP BY 1 ORDER BY 1;`
+
+const GET_ALL_TRADES_BY_GAME_HASH =
+  'SELECT * FROM casino_trades WHERE gameHash = $1;';
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -740,7 +751,7 @@ async function getLostBets(gameHash){
  * @param limit {Number}
  *
  */
-async function getHighBetsInInterval(interval = '24 hours', limit = 100){
+async function getHighBetsInInterval(interval = 24, limit = 100){
   const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
   return res.rows;
 }
@@ -752,7 +763,7 @@ async function getHighBetsInInterval(interval = '24 hours', limit = 100){
  * @param limit {Number}
  *
  */
-async function getLuckyBetsInInterval(interval = '24 hours', limit = 100){
+async function getLuckyBetsInInterval(interval = 24, limit = 100){
   const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
   return res.rows;
 }
@@ -784,7 +795,7 @@ async function getMatchById(matchId){
 }
 
 /**
- * Get matches
+ * For game details, get match by game hash, dont allow to get current match to avoid crash factor leak
  * PostgreSQL interval
  *
  * @param gameHash {String}
@@ -792,8 +803,32 @@ async function getMatchById(matchId){
  */
 async function getMatchByGameHash(gameHash){
   const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
-  if(res.rows.length) return res.rows[0].id;
-  throw new Error('Match not found')
+  return res.rows;
+}
+
+
+/**
+ * get next match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getNextMatchByGameHash(gameHash) {
+  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  return res.rows;
+}
+
+/**
+ * get prev match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getPrevMatchByGameHash(gameHash) {
+  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  return res.rows;
 }
 
 /**
@@ -817,6 +852,32 @@ async function getMatchesForUpdateMissingValues() {
  */
 async function updateMatchesMissingValues(gameHash) {
   const res = await pool.query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
+  return res.rows;
+}
+
+/**
+ * check if user by id played X days in a row (default 6), return [day, total_played] columns, grouped by day
+ * PostgreSQL
+ *
+ * @param userId {String}
+ * @param lastDays {Number}
+ *
+ */
+async function getUserPlayedLastXDaysInRow(userId, lastDays= 6) {
+  const res = await pool.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
+  return res.rows;
+}
+
+/**
+ * get trades by gameHash and sort them by staked amount
+ * PostgreSQL
+ *
+ * @param userId {String}
+ * @param lastDays {Number}
+ *
+ */
+async function getAllTradesByGameHash(gameHash) {
+  const res = await pool.query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
   return res.rows;
 }
 
@@ -872,5 +933,9 @@ module.exports = {
   getUpcomingBets,
   getMatchByGameHash,
   getMatchesForUpdateMissingValues,
-  updateMatchesMissingValues
+  updateMatchesMissingValues,
+  getUserPlayedLastXDaysInRow,
+  getAllTradesByGameHash,
+  getNextMatchByGameHash,
+  getPrevMatchByGameHash
 };
