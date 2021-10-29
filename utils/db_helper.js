@@ -101,7 +101,7 @@ const GET_CASINO_TRADES =
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND state = $4 AND userId = $5 RETURNING *;';
 const CANCEL_CASINO_TRADE =
-  `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.CANCELED} WHERE id = $1 RETURNING *;`;
+  `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.CANCELED} WHERE id = $1 AND state = ${CASINO_TRADE_STATE.OPEN} AND gameHash IS NULL RETURNING *;`;
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 const GET_CASINO_TRADES_BY_PERIOD =
