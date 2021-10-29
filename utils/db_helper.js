@@ -125,7 +125,7 @@ const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
-  `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at LIMIT 10`;
+  `SELECT * FROM casino_matches cm WHERE amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL ORDER BY created_at DESC LIMIT 50`;
 const UPDATE_CASINO_MATCHES_MISSING_VALUES =
   `UPDATE casino_matches cm
    SET amountinvestedsum=amountinvestedsum_query.total,
