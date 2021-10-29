@@ -119,6 +119,11 @@ const GET_CASINO_MATCH_BY_ID =
 const GET_CASINO_MATCH_BY_GAME_HASH =
   'SELECT * FROM casino_matches WHERE gamehash = $1'
 
+const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id ORDER BY ID asc limit 1;`
+const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
+
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
   `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at`;
 const UPDATE_CASINO_MATCHES_MISSING_VALUES =
@@ -136,6 +141,9 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
 
 const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
   `SELECT date_trunc('day', ct.created_at) "day", count(1) AS total_played FROM casino_trades ct WHERE ct.userid = $1 and ct.created_at >= CURRENT_TIMESTAMP - $2 * INTERVAL '1 day' GROUP BY 1 ORDER BY 1;`
+
+const GET_TRADES_BY_GAME_HASH_SORTED =
+  'SELECT * FROM casino_trades WHERE gameHash = $1 ORDER BY (crashfactor * stakedamount) DESC;';
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -799,6 +807,31 @@ async function getMatchByGameHash(gameHash){
   throw new Error('Match not found')
 }
 
+
+/**
+ * get next match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getNextMatchByGameHash(gameHash) {
+  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  return res.rows;
+}
+
+/**
+ * get prev match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ *
+ */
+async function getPrevMatchByGameHash(gameHash) {
+  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  return res.rows;
+}
+
 /**
  * get matches for update missing values for past games, only when some trades are available by game_id
  * PostgreSQL
@@ -833,6 +866,19 @@ async function updateMatchesMissingValues(gameHash) {
  */
 async function getUserPlayedLastXDaysInRow(userId, lastDays= 6) {
   const res = await pool.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
+  return res.rows;
+}
+
+/**
+ * get trades by gameHash and sort them by staked amount
+ * PostgreSQL
+ *
+ * @param userId {String}
+ * @param lastDays {Number}
+ *
+ */
+async function getTradesByGameHashSorted(gameHash) {
+  const res = await pool.query(GET_TRADES_BY_GAME_HASH_SORTED, [gameHash]);
   return res.rows;
 }
 
@@ -889,5 +935,8 @@ module.exports = {
   getMatchByGameHash,
   getMatchesForUpdateMissingValues,
   updateMatchesMissingValues,
-  getUserPlayedLastXDaysInRow
+  getUserPlayedLastXDaysInRow,
+  getTradesByGameHashSorted,
+  getNextMatchByGameHash,
+  getPrevMatchByGameHash
 };
