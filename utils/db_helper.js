@@ -117,7 +117,7 @@ const GET_CASINO_MATCHES =
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
-  'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NULL AND amountrewardedsum IS NULL AND numtrades IS NULL AND numcashouts IS NULL;'
+  'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id ORDER BY ID asc limit 1;`
