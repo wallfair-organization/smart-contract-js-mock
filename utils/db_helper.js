@@ -125,7 +125,7 @@ const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
-  `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at`;
+  `SELECT * FROM casino_matches cm WHERE (amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL) AND exists (SELECT * FROM casino_trades ct WHERE cm.id = ct.game_match) ORDER BY created_at LIMIT 10`;
 const UPDATE_CASINO_MATCHES_MISSING_VALUES =
   `UPDATE casino_matches cm
    SET amountinvestedsum=amountinvestedsum_query.total,
@@ -704,7 +704,7 @@ async function getLatestPriceActions(betId) {
 /**
  * Get upcoming bets (open bets)
  */
-async function getUpcomingBets(){
+async function getUpcomingBets() {
   const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
   return res.rows;
 }
@@ -715,7 +715,7 @@ async function getUpcomingBets(){
  * @param gameHash {String}
  *
  */
-async function getCurrentBets(gameHash){
+async function getCurrentBets(gameHash) {
   const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
   return res.rows;
 }
@@ -726,7 +726,7 @@ async function getCurrentBets(gameHash){
  * @param gameHash {String}
  *
  */
-async function getCashedOutBets(gameHash){
+async function getCashedOutBets(gameHash) {
   const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
@@ -737,7 +737,7 @@ async function getCashedOutBets(gameHash){
  * @param gameHash {String}
  *
  */
-async function getLostBets(gameHash){
+async function getLostBets(gameHash) {
   const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
@@ -751,7 +751,7 @@ async function getLostBets(gameHash){
  * @param limit {Number}
  *
  */
-async function getHighBetsInInterval(interval = 24, limit = 100){
+async function getHighBetsInInterval(interval = 24, limit = 100) {
   const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
   return res.rows;
 }
@@ -763,7 +763,7 @@ async function getHighBetsInInterval(interval = 24, limit = 100){
  * @param limit {Number}
  *
  */
-async function getLuckyBetsInInterval(interval = 24, limit = 100){
+async function getLuckyBetsInInterval(interval = 24, limit = 100) {
   const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
   return res.rows;
 }
@@ -777,7 +777,7 @@ async function getLuckyBetsInInterval(interval = 24, limit = 100){
  * @param gameId {String}
  *
  */
-async function getMatches(page = 1, perPage= 10, gameId = process.env.GAME_ID){
+async function getMatches(page = 1, perPage = 10, gameId = process.env.GAME_ID) {
   const res = await pool.query(GET_CASINO_MATCHES, [gameId, perPage, page])
   return res.rows;
 }
@@ -789,7 +789,7 @@ async function getMatches(page = 1, perPage= 10, gameId = process.env.GAME_ID){
  * @param matchId {Number}
  *
  */
-async function getMatchById(matchId){
+async function getMatchById(matchId) {
   const res = await pool.query(GET_CASINO_MATCH_BY_ID, [matchId])
   return res.rows[0];
 }
@@ -801,7 +801,7 @@ async function getMatchById(matchId){
  * @param gameHash {String}
  *
  */
-async function getMatchByGameHash(gameHash){
+async function getMatchByGameHash(gameHash) {
   const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
   return res.rows;
 }
@@ -863,7 +863,7 @@ async function updateMatchesMissingValues(gameHash) {
  * @param lastDays {Number}
  *
  */
-async function getUserPlayedLastXDaysInRow(userId, lastDays= 6) {
+async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
   const res = await pool.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
   return res.rows;
 }
