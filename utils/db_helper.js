@@ -117,7 +117,7 @@ const GET_CASINO_MATCHES =
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
-  'SELECT * FROM casino_matches WHERE gamehash = $1'
+  'SELECT * FROM casino_matches WHERE gamehash = $1;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id ORDER BY ID asc limit 1;`
@@ -142,8 +142,8 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
 const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
   `SELECT date_trunc('day', ct.created_at) "day", count(1) AS total_played FROM casino_trades ct WHERE ct.userid = $1 and ct.created_at >= CURRENT_TIMESTAMP - $2 * INTERVAL '1 day' GROUP BY 1 ORDER BY 1;`
 
-const GET_TRADES_BY_GAME_HASH_SORTED =
-  'SELECT * FROM casino_trades WHERE gameHash = $1 ORDER BY (crashfactor * stakedamount) DESC;';
+const GET_ALL_TRADES_BY_GAME_HASH =
+  'SELECT * FROM casino_trades WHERE gameHash = $1;';
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -877,8 +877,8 @@ async function getUserPlayedLastXDaysInRow(userId, lastDays= 6) {
  * @param lastDays {Number}
  *
  */
-async function getTradesByGameHashSorted(gameHash) {
-  const res = await pool.query(GET_TRADES_BY_GAME_HASH_SORTED, [gameHash]);
+async function getAllTradesByGameHash(gameHash) {
+  const res = await pool.query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
   return res.rows;
 }
 
@@ -936,7 +936,7 @@ module.exports = {
   getMatchesForUpdateMissingValues,
   updateMatchesMissingValues,
   getUserPlayedLastXDaysInRow,
-  getTradesByGameHashSorted,
+  getAllTradesByGameHash,
   getNextMatchByGameHash,
   getPrevMatchByGameHash
 };

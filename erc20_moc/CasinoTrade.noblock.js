@@ -24,7 +24,7 @@ const {
   getMatchesForUpdateMissingValues,
   updateMatchesMissingValues,
   getUserPlayedLastXDaysInRow,
-  getTradesByGameHashSorted,
+  getAllTradesByGameHash,
   getNextMatchByGameHash,
   getPrevMatchByGameHash
 } = require('../utils/db_helper');
@@ -194,7 +194,7 @@ class CasinoTrade {
 
   getUserPlayedLastXDaysInRow = async (userId, lastDays) => getUserPlayedLastXDaysInRow(userId, lastDays)
 
-  getTradesByGameHashSorted = async (gameHash) => getTradesByGameHashSorted(gameHash)
+  getAllTradesByGameHash = async (gameHash) => getAllTradesByGameHash(gameHash)
 
   getNextMatchByGameHash = async (gameHash) => getNextMatchByGameHash(gameHash)
   getPrevMatchByGameHash = async (gameHash) => getPrevMatchByGameHash(gameHash)
