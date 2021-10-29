@@ -117,7 +117,7 @@ const GET_CASINO_MATCHES =
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
-  'SELECT * FROM casino_matches WHERE gamehash = $1;'
+  'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NULL AND amountrewardedsum IS NULL AND numtrades IS NULL AND numcashouts IS NULL;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id ORDER BY ID asc limit 1;`
@@ -795,7 +795,7 @@ async function getMatchById(matchId){
 }
 
 /**
- * Get matches
+ * For game details, get match by game hash, dont allow to get current match to avoid crash factor leak
  * PostgreSQL interval
  *
  * @param gameHash {String}
