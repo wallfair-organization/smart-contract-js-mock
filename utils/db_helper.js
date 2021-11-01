@@ -145,6 +145,9 @@ const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
 const GET_ALL_TRADES_BY_GAME_HASH =
   'SELECT * FROM casino_trades WHERE gameHash = $1;';
 
+const SET_CASINO_LOST_TRADES_STATE =
+    `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
+
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
     outcomeindex, avg(quote) as quote
@@ -742,7 +745,17 @@ async function getLostBets(gameHash) {
   return res.rows;
 }
 
-
+/**
+ * Set lost trades and crash factor by gameHash
+ *
+ * @param gameHash {String}
+ * @param crashFactor {String}
+ *
+ */
+async function setLostTrades(gameHash, crashFactor) {
+  const res = await pool.query(SET_CASINO_LOST_TRADES_STATE, [gameHash, crashFactor])
+  return res.rows;
+}
 
 /**
  * Get high bets (highest amount won)
@@ -937,5 +950,6 @@ module.exports = {
   getUserPlayedLastXDaysInRow,
   getAllTradesByGameHash,
   getNextMatchByGameHash,
-  getPrevMatchByGameHash
+  getPrevMatchByGameHash,
+  setLostTrades
 };
