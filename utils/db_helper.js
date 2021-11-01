@@ -133,8 +133,8 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
        numtrades=numtrades_query.total,
        numcashouts=numcashouts_query.total
    FROM
-     (SELECT SUM(stakedamount) as total from casino_trades ct where ct.gamehash=$1) AS amountinvestedsum_query,
-     (SELECT COALESCE(sum(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash=$1) AS amountrewardedsum_query,
+     (SELECT COALESCE(SUM(stakedamount),0) as total from casino_trades ct where ct.gamehash=$1) AS amountinvestedsum_query,
+     (SELECT COALESCE(SUM(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash=$1) AS amountrewardedsum_query,
      (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1) AS numtrades_query,
      (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1 and ct.state=2) AS numcashouts_query
    WHERE cm.gamehash=$1`;
@@ -144,6 +144,9 @@ const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
 
 const GET_ALL_TRADES_BY_GAME_HASH =
   'SELECT * FROM casino_trades WHERE gameHash = $1;';
+
+const SET_CASINO_LOST_TRADES_STATE =
+    `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -742,7 +745,17 @@ async function getLostBets(gameHash) {
   return res.rows;
 }
 
-
+/**
+ * Set lost trades and crash factor by gameHash
+ *
+ * @param gameHash {String}
+ * @param crashFactor {String}
+ *
+ */
+async function setLostTrades(gameHash, crashFactor) {
+  const res = await pool.query(SET_CASINO_LOST_TRADES_STATE, [gameHash, crashFactor])
+  return res.rows;
+}
 
 /**
  * Get high bets (highest amount won)
@@ -937,5 +950,6 @@ module.exports = {
   getUserPlayedLastXDaysInRow,
   getAllTradesByGameHash,
   getNextMatchByGameHash,
-  getPrevMatchByGameHash
+  getPrevMatchByGameHash,
+  setLostTrades
 };
