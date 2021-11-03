@@ -40,7 +40,7 @@ class CasinoTrade {
     this.WFAIRToken = new ERC20(WFAIR_TOKEN);
   }
 
-  placeTrade = async (userWalletAddr, stakedAmount, crashFactor) => {
+  placeTrade = async (userWalletAddr, stakedAmount, crashFactor, gameId) => {
     const dbClient = await createDBTransaction();
 
     try {
@@ -51,7 +51,7 @@ class CasinoTrade {
         this.casinoWalletAddr,
         stakedAmount
       );
-      await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount);
+      await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
