@@ -27,7 +27,8 @@ const {
   getAllTradesByGameHash,
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
-  setLostTrades
+  setLostTrades,
+  getOpenTrade
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -201,6 +202,8 @@ class CasinoTrade {
   getPrevMatchByGameHash = async (gameHash) => getPrevMatchByGameHash(gameHash)
 
   setLostTrades = async (gameHash, crashFactor) => setLostTrades(gameHash, crashFactor)
+
+  getOpenTrade = async (userId, gameId) => getOpenTrade(userId, gameId)
 
 }
 
