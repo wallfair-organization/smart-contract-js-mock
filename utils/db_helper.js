@@ -109,9 +109,9 @@ const GET_CASINO_TRADES_BY_PERIOD =
 const GET_OPEN_TRADES_BY_USER_AND_GAME =
   `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND userId = $1 AND gameId = $2`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_CASINO_MATCHES =
@@ -122,9 +122,9 @@ const GET_CASINO_MATCH_BY_GAME_HASH =
   'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
-  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND gameId = $2 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
 const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
-  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id AND gameId = $2 ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
   `SELECT * FROM casino_matches cm WHERE amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL ORDER BY created_at DESC LIMIT 50`;
@@ -766,10 +766,11 @@ async function setLostTrades(gameHash, crashFactor) {
  * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
  * @param interval {String}
  * @param limit {Number}
+ * @param gameId {String}
  *
  */
-async function getHighBetsInInterval(interval = 24, limit = 100) {
-  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
+async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
+  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
   return res.rows;
 }
 
@@ -778,10 +779,11 @@ async function getHighBetsInInterval(interval = 24, limit = 100) {
  * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
  * @param interval {String}
  * @param limit {Number}
+ * @param gameId {String}
  *
  */
-async function getLuckyBetsInInterval(interval = 24, limit = 100) {
-  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
+async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
+  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
   return res.rows;
 }
 
@@ -829,10 +831,10 @@ async function getMatchByGameHash(gameHash) {
  * PostgreSQL
  *
  * @param gameHash {String}
- *
+ * @param gameId {String}
  */
-async function getNextMatchByGameHash(gameHash) {
-  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+async function getNextMatchByGameHash(gameHash, gameId) {
+  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -841,10 +843,10 @@ async function getNextMatchByGameHash(gameHash) {
  * PostgreSQL
  *
  * @param gameHash {String}
- *
+ * @param gameId {String}
  */
-async function getPrevMatchByGameHash(gameHash) {
-  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+async function getPrevMatchByGameHash(gameHash, gameId) {
+  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
