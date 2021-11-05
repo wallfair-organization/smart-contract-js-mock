@@ -28,7 +28,8 @@ const {
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
   setLostTrades,
-  getOpenTrade
+  getOpenTrade,
+  countTradesByLastXHours
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -205,6 +206,7 @@ class CasinoTrade {
 
   getOpenTrade = async (userId, gameId) => getOpenTrade(userId, gameId)
 
+  countTradesByLastXHours = async (lastHours) => countTradesByLastXHours(lastHours)
 }
 
 module.exports = CasinoTrade;
