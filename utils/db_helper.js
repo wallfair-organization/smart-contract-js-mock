@@ -105,7 +105,7 @@ const CANCEL_CASINO_TRADE =
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 const GET_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - interval '$1 hours' ORDER BY $2 DESC`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' ORDER BY $2 DESC`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
@@ -147,6 +147,12 @@ const GET_ALL_TRADES_BY_GAME_HASH =
 
 const SET_CASINO_LOST_TRADES_STATE =
     `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
+
+const COUNT_CASINO_TRADES_BY_LAST_X_HOURS =
+    `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) AND created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour';`
+
+const COUNT_CASINO_TRADES_BY_ALLTIME =
+    `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]);`
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
@@ -894,6 +900,20 @@ async function getAllTradesByGameHash(gameHash) {
   return res.rows;
 }
 
+/**
+ * count casino trades in last x hours, where states are 1, 2, 3, when hours=0 we are showing all time stats
+ * PostgreSQL
+ *
+ * @param lastHours {String}
+ *
+ */
+async function countTradesByLastXHours(lastHours = 24) {
+  const useQuery = lastHours === 0 ? COUNT_CASINO_TRADES_BY_ALLTIME : COUNT_CASINO_TRADES_BY_LAST_X_HOURS;
+  const useParams = lastHours === 0 ? [] : [lastHours];
+
+  const res = await pool.query(useQuery, useParams);
+  return res.rows;
+}
 
 module.exports = {
   pool,
@@ -951,5 +971,6 @@ module.exports = {
   getAllTradesByGameHash,
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
-  setLostTrades
+  setLostTrades,
+  countTradesByLastXHours
 };
