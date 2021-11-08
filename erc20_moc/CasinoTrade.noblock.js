@@ -28,6 +28,7 @@ const {
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
   setLostTrades,
+  getOpenTrade,
   countTradesByLastXHours
 } = require('../utils/db_helper');
 
@@ -40,7 +41,7 @@ class CasinoTrade {
     this.WFAIRToken = new ERC20(WFAIR_TOKEN);
   }
 
-  placeTrade = async (userWalletAddr, stakedAmount, crashFactor) => {
+  placeTrade = async (userWalletAddr, stakedAmount, crashFactor, gameId) => {
     const dbClient = await createDBTransaction();
 
     try {
@@ -51,7 +52,7 @@ class CasinoTrade {
         this.casinoWalletAddr,
         stakedAmount
       );
-      await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount);
+      await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -181,9 +182,9 @@ class CasinoTrade {
     return {cashedOutBets, upcomingBets, currentBets}
   }
 
-  getLuckyWins = async (lastHours, limit) => await getLuckyBetsInInterval(lastHours, limit)
+  getLuckyWins = async (lastHours, limit, gameId) => await getLuckyBetsInInterval(lastHours, limit, gameId)
 
-  getHighWins = async (lastHours, limit) => await getHighBetsInInterval(lastHours, limit)
+  getHighWins = async (lastHours, limit, gameId) => await getHighBetsInInterval(lastHours, limit, gameId)
 
   getMatches = async (page, perPage, gameId) => await getMatches(page, perPage, gameId)
 
@@ -198,10 +199,13 @@ class CasinoTrade {
 
   getAllTradesByGameHash = async (gameHash) => getAllTradesByGameHash(gameHash)
 
-  getNextMatchByGameHash = async (gameHash) => getNextMatchByGameHash(gameHash)
-  getPrevMatchByGameHash = async (gameHash) => getPrevMatchByGameHash(gameHash)
+  getNextMatchByGameHash = async (gameHash, gameId) => getNextMatchByGameHash(gameHash, gameId)
+  getPrevMatchByGameHash = async (gameHash, gameId) => getPrevMatchByGameHash(gameHash, gameId)
 
   setLostTrades = async (gameHash, crashFactor) => setLostTrades(gameHash, crashFactor)
+
+  getOpenTrade = async (userId, gameId) => getOpenTrade(userId, gameId)
+
   countTradesByLastXHours = async (lastHours) => countTradesByLastXHours(lastHours)
 }
 

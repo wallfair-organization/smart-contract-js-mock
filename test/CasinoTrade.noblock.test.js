@@ -27,7 +27,7 @@ test('Run a game', async () => {
     await WFAIR.mint(`${BASE_WALLET}_${i}`, 5000n * WFAIR.ONE);
 
     // each player places a trade
-    await casino.placeTrade(`${BASE_WALLET}_${i}`, 2000n * WFAIR.ONE, 999);
+    await casino.placeTrade(`${BASE_WALLET}_${i}`, 2000n * WFAIR.ONE, 999, 'gameId');
   }
 
   // lock the trades

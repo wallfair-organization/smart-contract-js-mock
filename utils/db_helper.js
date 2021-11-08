@@ -46,7 +46,7 @@ const CREATE_AMM_INTERACTIONS =
 const CREATE_CASINO_MATCHES =
   'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
 const CREATE_CASINO_TRADES =
-  'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
+  'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
 
 // ALTER TABLE token_transactions ALTER COLUMN amount TYPE BIGINT;
 // ALTER TABLE token_balances ALTER COLUMN balance TYPE BIGINT;
@@ -92,8 +92,8 @@ const GET_REPORT = 'SELECT * FROM bet_reports WHERE bet_id = $1;';
 const INSERT_CASINO_MATCH =
   'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds) VALUES ($1, $2, $3, $4) RETURNING id;';
 const INSERT_CASINO_TRADE =
-  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state) VALUES ($1, $2, $3, $4);';
-const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN};`;
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
+const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
 const GET_CASINO_TRADES =
@@ -106,10 +106,12 @@ const GET_CASINO_TRADES_BY_USER_AND_STATES =
   'SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY($2::smallint[]);';
 const GET_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' ORDER BY $2 DESC`
+const GET_OPEN_TRADES_BY_USER_AND_GAME =
+  `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND userId = $1 AND gameId = $2`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_CASINO_MATCHES =
@@ -120,9 +122,9 @@ const GET_CASINO_MATCH_BY_GAME_HASH =
   'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
-  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND gameId = $2 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
 const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
-  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id ORDER BY ID DESC limit 1;`
+  `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id AND gameId = $2 ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
   `SELECT * FROM casino_matches cm WHERE amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL ORDER BY created_at DESC LIMIT 50`;
@@ -377,13 +379,15 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @param userWalletAddr  {String}
  * @param crashFactor {Number}
  * @param stakedAmount {Number}
+ * @param gameId {String}
  */
-async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmount) {
+async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId) {
   await client.query(INSERT_CASINO_TRADE, [
     userWalletAddr,
     crashFactor,
     stakedAmount,
     CASINO_TRADE_STATE.OPEN,
+    gameId
   ]);
 }
 
@@ -425,7 +429,7 @@ async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
 async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS) {
   let res = await client.query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
   let matchId = res.rows[0].id;
-  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId]);
+  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
 }
 
 /**
@@ -768,10 +772,11 @@ async function setLostTrades(gameHash, crashFactor) {
  * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
  * @param interval {String}
  * @param limit {Number}
+ * @param gameId {String}
  *
  */
-async function getHighBetsInInterval(interval = 24, limit = 100) {
-  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit])
+async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
+  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
   return res.rows;
 }
 
@@ -780,10 +785,11 @@ async function getHighBetsInInterval(interval = 24, limit = 100) {
  * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
  * @param interval {String}
  * @param limit {Number}
+ * @param gameId {String}
  *
  */
-async function getLuckyBetsInInterval(interval = 24, limit = 100) {
-  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit])
+async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
+  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
   return res.rows;
 }
 
@@ -831,10 +837,10 @@ async function getMatchByGameHash(gameHash) {
  * PostgreSQL
  *
  * @param gameHash {String}
- *
+ * @param gameId {String}
  */
-async function getNextMatchByGameHash(gameHash) {
-  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+async function getNextMatchByGameHash(gameHash, gameId) {
+  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -843,10 +849,10 @@ async function getNextMatchByGameHash(gameHash) {
  * PostgreSQL
  *
  * @param gameHash {String}
- *
+ * @param gameId {String}
  */
-async function getPrevMatchByGameHash(gameHash) {
-  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+async function getPrevMatchByGameHash(gameHash, gameId) {
+  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -898,6 +904,12 @@ async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
 async function getAllTradesByGameHash(gameHash) {
   const res = await pool.query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
   return res.rows;
+}
+
+async function getOpenTrade(userId, gameId){
+  const res = await pool.query(GET_OPEN_TRADES_BY_USER_AND_GAME, [userId, gameId])
+  if(res.rows.length) return res.rows[0];
+  throw new Error('Trade not found')
 }
 
 /**
@@ -972,5 +984,6 @@ module.exports = {
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
   setLostTrades,
+  getOpenTrade,
   countTradesByLastXHours
 };
