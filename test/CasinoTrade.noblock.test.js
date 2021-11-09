@@ -13,7 +13,7 @@ describe("CasinoTrade", () => {
   var casino = new Casino(casinoWallet);
   const BASE_WALLET = 'playerWallet';
   const liquidityAmount = 1000000n * WFAIR.ONE;
-
+  const NoWeb3Exception = require('../erc20_moc/Exception.noblock');
 
   jest.setTimeout(1000000);
 
@@ -50,11 +50,13 @@ describe("CasinoTrade", () => {
       expect(await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.OPEN])).toHaveLength(1);
     });
 
-    it("Place a faulty trade", async () => {
-      //Needs to mock the DB to simulate a connectivity error
-      //expect(await casino.placeTrade(null, null, 10)).rejects.toThrow();
+    it("Throw an exception when there's no sender funds", async () => {
+      //Validates that a NoWeb3Exception is thrown if sender has no money
+      await expect(casino.placeTrade("noMoneyWallet", 150, 10))
+        .rejects.toBeInstanceOf(NoWeb3Exception);
 
     });
+
   });
 
   describe("Cancel a Trade", () => {
@@ -73,10 +75,6 @@ describe("CasinoTrade", () => {
       expect(await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.CANCELED])).toHaveLength(1);
     });
 
-    it("Rollback cancelation of an existing trade", async () => {
-
-    });
-
   });
 
   describe("Lock trades", () => {
@@ -92,10 +90,6 @@ describe("CasinoTrade", () => {
       expect(await casino.getCasinoTradesByUserIdAndStates("TestLockWallet", [CASINO_TRADE_STATE.LOCKED])).toHaveLength(1);
 
     });
-
-    //it("Fail to lock a trade", async () => {
-    //  await casino.lockOpenTrades('gameId', 'gameId', null, 10000);
-    //});
 
   });
 
