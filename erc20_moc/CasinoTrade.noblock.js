@@ -42,6 +42,7 @@ class CasinoTrade {
   }
 
   placeTrade = async (userWalletAddr, stakedAmount, crashFactor, gameId) => {
+    if(!gameId) throw new Error('Game id is required to place a trade');
     const dbClient = await createDBTransaction();
 
     try {
@@ -168,14 +169,14 @@ class CasinoTrade {
   getCasinoTradesByUserIdAndStates = async (userId, states) =>
     await getCasinoTradesByUserAndStates(userId, states);
 
-  getBets = async (gameHash) => {
-    if (!gameHash) {
-      const upcomingBets = await getUpcomingBets()
-      return { cashedOutBets: [], upcomingBets, currentBets: [] }
+  getBets = async (gameHash, gameId) => {
+    if(!gameHash){
+      const upcomingBets = await getUpcomingBets(gameId)
+      return {cashedOutBets: [], upcomingBets, currentBets: []}
     }
 
     const cashedOutBets = await getCashedOutBets(gameHash)
-    const upcomingBets = await getUpcomingBets()
+    const upcomingBets = await getUpcomingBets(gameId)
     const currentBets = await getCurrentBets(gameHash)
 
     return { cashedOutBets, upcomingBets, currentBets }
