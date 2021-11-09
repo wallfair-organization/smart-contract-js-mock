@@ -25,7 +25,7 @@ describe("CasinoTrade", () => {
   afterAll(async () => teardownDatabase());
 
   beforeEach(async () => {
-    casino = new Casino(casinoWallet);
+    //casino = new Casino(casinoWallet);
 
     //set-up a base number of tokens to be used in the tests
     await WFAIR.mint(casinoWallet, liquidityAmount);
@@ -43,7 +43,7 @@ describe("CasinoTrade", () => {
 
     it("Place a succesful trade", async () => {
       const tradeAmount = 1000n * WFAIR.ONE;
-      await casino.placeTrade(BASE_WALLET, tradeAmount, 1);
+      await casino.placeTrade(BASE_WALLET, tradeAmount, 1, "sucessfulTradeGame");
 
       expect(await WFAIR.balanceOf(casinoWallet)).toBe(liquidityAmount + tradeAmount)
       expect(await WFAIR.balanceOf(BASE_WALLET)).toBe(10000n * WFAIR.ONE - tradeAmount)
@@ -52,8 +52,13 @@ describe("CasinoTrade", () => {
 
     it("Throw an exception when there's no sender funds", async () => {
       //Validates that a NoWeb3Exception is thrown if sender has no money
-      await expect(casino.placeTrade("noMoneyWallet", 150, 10))
+      await expect(casino.placeTrade("noMoneyWallet", 150, 10, "noSenderFundsGame"))
         .rejects.toBeInstanceOf(NoWeb3Exception);
+
+    });
+
+    it("Throw an exception when no game Id is provided", async () => {
+      await expect(casino.placeTrade(BASE_WALLET, 1000, 1)).rejects.toThrowError();
 
     });
 
@@ -63,16 +68,20 @@ describe("CasinoTrade", () => {
 
     it("Successfully cancel an existing trade", async () => {
       const tradeAmount = 1000n * WFAIR.ONE;
-      await casino.placeTrade(BASE_WALLET, tradeAmount, 1);
+      const wallet = 'cancelTradeWallet';
+      WFAIR.mint(wallet, 10000n * WFAIR.ONE);
+      await casino.placeTrade(wallet, tradeAmount, 1, "cancelTradeGame");
 
-      const casinoTrade = (await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.OPEN]))[0];
+      const casinoTrade = (await casino.getCasinoTradesByUserIdAndStates(wallet, [CASINO_TRADE_STATE.OPEN]))[0];
       const { id } = casinoTrade;
       let openTrade = { stakedamount: tradeAmount, id: id };
-      await casino.cancelTrade(BASE_WALLET, openTrade);
+      await casino.cancelTrade(wallet, openTrade);
 
       expect(await WFAIR.balanceOf(casinoWallet)).toBe(liquidityAmount)
-      expect(await WFAIR.balanceOf(BASE_WALLET)).toBe(10000n * WFAIR.ONE)
-      expect(await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.CANCELED])).toHaveLength(1);
+      expect(await WFAIR.balanceOf(wallet)).toBe(10000n * WFAIR.ONE)
+      expect(await casino.getCasinoTradesByUserIdAndStates(wallet, [CASINO_TRADE_STATE.CANCELED])).toHaveLength(1);
+      expect(await casino.getCasinoTradesByUserIdAndStates(wallet, [CASINO_TRADE_STATE.OPEN])).toHaveLength(0);
+
     });
 
   });
@@ -171,7 +180,7 @@ describe("CasinoTrade", () => {
       await casino.placeTrade(`${BASE_WALLET}_currentBets`, 2000n * WFAIR.ONE, 3, 'gameIdBetsCurrent');
       await casino.lockOpenTrades('gameIdBetsCurrent', 'gameIdBetsCurrent', 3, 10000);
 
-      const result = await casino.getBets("gameIdBetsCurrent");
+      const result = await casino.getBets("gameIdBetsCurrent", 'gameIdBetsCurrent');
 
       //Ensure only 1 currentBet is retrieved
       expect(result.cashedOutBets).toHaveLength(0);
@@ -187,7 +196,7 @@ describe("CasinoTrade", () => {
 
       await casino.lockOpenTrades('multipleCurrentBets', 'multipleCurrentBets', 3, 10000);
 
-      const result = await casino.getBets("multipleCurrentBets");
+      const result = await casino.getBets("multipleCurrentBets", 'multipleCurrentBets');
 
       //Ensure multiple currentBets can be retrieved
       expect(result.cashedOutBets).toHaveLength(0);
@@ -200,20 +209,7 @@ describe("CasinoTrade", () => {
 
       await casino.placeTrade(`${BASE_WALLET}_upcomingBets`, 2000n * WFAIR.ONE, 3, "gameIdBetsUpcoming");
 
-      const result = await casino.getBets("gameIdBetsUpcoming");
-
-      //Ensure only 1 upcoming bet is retrieved
-      expect(result.cashedOutBets).toHaveLength(0);
-      expect(result.upcomingBets).toHaveLength(1);
-      expect(result.currentBets).toHaveLength(0);
-    });
-
-    it("Get existing upcoming bet without a game", async () => {
-      await WFAIR.mint(`${BASE_WALLET}_upcomingBetsNoGame`, 5000n * WFAIR.ONE);
-
-      await casino.placeTrade(`${BASE_WALLET}_upcomingBetsNoGame`, 2000n * WFAIR.ONE, 3, 'noGame');
-
-      const result = await casino.getBets(null);
+      const result = await casino.getBets("gameIdBetsUpcoming", "gameIdBetsUpcoming");
 
       //Ensure only 1 upcoming bet is retrieved
       expect(result.cashedOutBets).toHaveLength(0);
@@ -227,7 +223,7 @@ describe("CasinoTrade", () => {
       await casino.placeTrade(`${BASE_WALLET}_multipleupcomingBets`, 2000n * WFAIR.ONE, 3, "gameIdMultipleBetsUpcoming");
       await casino.placeTrade(BASE_WALLET, 2000n * WFAIR.ONE, 3, "gameIdMultipleBetsUpcoming");
 
-      const result = await casino.getBets("gameIdMultipleBetsUpcoming");
+      const result = await casino.getBets("gameIdMultipleBetsUpcoming", "gameIdMultipleBetsUpcoming");
 
       //Ensure only multiple upcoming bet are retrieved
       expect(result.cashedOutBets).toHaveLength(0);
@@ -244,7 +240,7 @@ describe("CasinoTrade", () => {
 
       await casino.cashout(`${BASE_WALLET}_cashedOutBet`, 3, 'cashedOutBet');
 
-      const result = await casino.getBets("cashedOutBet");
+      const result = await casino.getBets("cashedOutBet", "cashedOutBet");
 
       //Ensure only 1 cashedOutBet is retrieved
       expect(result.cashedOutBets).toHaveLength(1);
@@ -263,7 +259,7 @@ describe("CasinoTrade", () => {
       await casino.cashout(`${BASE_WALLET}_multipleCashedOutBet`, 3, 'multipleCashedOutBet');
       await casino.cashout(BASE_WALLET, 3, 'multipleCashedOutBet');
 
-      const result = await casino.getBets("multipleCashedOutBet");
+      const result = await casino.getBets("multipleCashedOutBet", "multipleCashedOutBet");
 
       //Ensure only multiple cashedOutBets are retrieved
       expect(result.cashedOutBets).toHaveLength(2);
