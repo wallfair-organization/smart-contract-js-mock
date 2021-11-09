@@ -1,42 +1,371 @@
 require('dotenv').config();
 
-const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
-const ERC20 = require('../erc20_moc/Erc20.noblock');
-const Casino = require('../erc20_moc/CasinoTrade.noblock');
 
-const WFAIR = new ERC20('WFAIR');
-const casinoWallet = 'CASINO';
-const BASE_WALLET = 'playerWallet';
-const liquidityAmount = 1000000n * WFAIR.ONE;
+describe("CasinoTrade", () => {
 
-jest.setTimeout(1000000);
 
-beforeAll(async () => await setupDatabase());
+  const { setupDatabase, teardownDatabase, CASINO_TRADE_STATE } = require('../utils/db_helper');
+  const ERC20 = require('../erc20_moc/Erc20.noblock');
+  const Casino = require('../erc20_moc/CasinoTrade.noblock');
 
-afterAll(async () => await teardownDatabase());
+  const WFAIR = new ERC20('WFAIR');
+  const casinoWallet = 'CASINO';
+  var casino = new Casino(casinoWallet);
+  const BASE_WALLET = 'playerWallet';
+  const liquidityAmount = 1000000n * WFAIR.ONE;
 
-beforeEach(async () => {
-  await WFAIR.mint(casinoWallet, liquidityAmount);
-});
 
-test('Run a game', async () => {
-  const casino = new Casino(casinoWallet);
+  jest.setTimeout(1000000);
 
-  for (let i = 1; i <= 5; i++) {
-    // mint players with 5000 WFAIR balance
-    await WFAIR.mint(`${BASE_WALLET}_${i}`, 5000n * WFAIR.ONE);
+  beforeAll(async () => {
+    await setupDatabase();
 
-    // each player places a trade
-    await casino.placeTrade(`${BASE_WALLET}_${i}`, 2000n * WFAIR.ONE, 999, 'gameId');
-  }
+  });
 
-  // lock the trades
-  await casino.lockOpenTrades('gameId', 'gameId', 3, 10000);
+  afterAll(async () => teardownDatabase());
 
-  // cashout
-  for (let i = 1; i <= 5; i++) {
-    expect((await casino.cashout(`${BASE_WALLET}_${i}`, 2.1, 'gameId')).totalReward).toBe(
-      42000000n
-    );
-  }
+  beforeEach(async () => {
+    casino = new Casino(casinoWallet);
+
+    //set-up a base number of tokens to be used in the tests
+    await WFAIR.mint(casinoWallet, liquidityAmount);
+    await WFAIR.mint(BASE_WALLET, 10000n * WFAIR.ONE);
+  });
+  afterEach(async () => {
+    //resets number of tokens in casino and base wallet
+    await WFAIR.burn(casinoWallet, await WFAIR.balanceOf(casinoWallet));
+    await WFAIR.burn(BASE_WALLET, await WFAIR.balanceOf(BASE_WALLET));
+
+    casino.lockOpenTrades("cleanupGame", "cleanupGame", 100, 100);
+  });
+  describe("Place a trade", () => {
+
+
+    it("Place a succesful trade", async () => {
+      const tradeAmount = 1000n * WFAIR.ONE;
+      await casino.placeTrade(BASE_WALLET, tradeAmount, 1);
+
+      expect(await WFAIR.balanceOf(casinoWallet)).toBe(liquidityAmount + tradeAmount)
+      expect(await WFAIR.balanceOf(BASE_WALLET)).toBe(10000n * WFAIR.ONE - tradeAmount)
+      expect(await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.OPEN])).toHaveLength(1);
+    });
+
+    it("Place a faulty trade", async () => {
+      //Needs to mock the DB to simulate a connectivity error
+      //expect(await casino.placeTrade(null, null, 10)).rejects.toThrow();
+
+    });
+  });
+
+  describe("Cancel a Trade", () => {
+
+    it("Successfully cancel an existing trade", async () => {
+      const tradeAmount = 1000n * WFAIR.ONE;
+      await casino.placeTrade(BASE_WALLET, tradeAmount, 1);
+
+      const casinoTrade = (await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.OPEN]))[0];
+      const { id } = casinoTrade;
+      let openTrade = { stakedamount: tradeAmount, id: id };
+      await casino.cancelTrade(BASE_WALLET, openTrade);
+
+      expect(await WFAIR.balanceOf(casinoWallet)).toBe(liquidityAmount)
+      expect(await WFAIR.balanceOf(BASE_WALLET)).toBe(10000n * WFAIR.ONE)
+      expect(await casino.getCasinoTradesByUserIdAndStates(BASE_WALLET, [CASINO_TRADE_STATE.CANCELED])).toHaveLength(1);
+    });
+
+    it("Rollback cancelation of an existing trade", async () => {
+
+    });
+
+  });
+
+  describe("Lock trades", () => {
+
+    it("Sucessfully lock a trade", async () => {
+      await WFAIR.mint("TestLockWallet", 10000n * WFAIR.ONE);
+      const tradeAmount = 1000n * WFAIR.ONE;
+      await casino.placeTrade("TestLockWallet", tradeAmount, 1, 'gameId');
+      console.log(await casino.getCasinoTradesByUserIdAndStates("TestLockWallet", [CASINO_TRADE_STATE.OPEN]));
+
+      await casino.lockOpenTrades('gameId', 'gameId', 3, 10000);
+      console.log(await casino.getCasinoTradesByUserIdAndStates("TestLockWallet", [CASINO_TRADE_STATE.OPEN]));
+      expect(await casino.getCasinoTradesByUserIdAndStates("TestLockWallet", [CASINO_TRADE_STATE.LOCKED])).toHaveLength(1);
+
+    });
+
+    //it("Fail to lock a trade", async () => {
+    //  await casino.lockOpenTrades('gameId', 'gameId', null, 10000);
+    //});
+
+  });
+
+  describe("Cashout money", () => {
+    it("Sucessfully cashout money for one player", async () => {
+
+      await WFAIR.mint(`${BASE_WALLET}_cashout`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashout`, 2000n * WFAIR.ONE, 3, 'gameIdSingle');
+
+      await casino.lockOpenTrades('gameIdSingle', 'gameIdSingle', 3, 10000);
+
+      const result = (await casino.cashout(`${BASE_WALLET}_cashout`, 3, 'gameIdSingle'));
+      expect(result.totalReward).toBe(2000n * WFAIR.ONE * 3n);
+      expect(result.stakedAmount).toBe(2000n * WFAIR.ONE);
+
+    });
+
+    //ToDo test for rounding cases, how does the reward is calculated if it's bigInt?
+
+    it('Sucessfully cashout money for several players', async () => {
+
+      for (let i = 1; i <= 5; i++) {
+        // mint players with 5000 WFAIR balance
+        await WFAIR.mint(`${BASE_WALLET}_${i}`, 5000n * WFAIR.ONE);
+
+        // each player places a trade
+        await casino.placeTrade(`${BASE_WALLET}_${i}`, 2000n * WFAIR.ONE, 3, 'gameIdMultiple');
+      }
+
+      // lock the trades
+      await casino.lockOpenTrades('gameIdMultiple', 'gameIdMultiple', 3, 10000);
+
+      // cashout
+      for (let i = 1; i <= 5; i++) {
+        const result = (await casino.cashout(`${BASE_WALLET}_${i}`, 3, 'gameIdMultiple'));
+        expect(result.totalReward).toBe(2000n * WFAIR.ONE * 3n);
+        expect(result.stakedAmount).toBe(2000n * WFAIR.ONE);
+      }
+    });
+
+    it("Fail to cashout due to missing game", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_cashout`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashout`, 2000n * WFAIR.ONE, 3, 'gameIdFail');
+
+      await casino.lockOpenTrades('gameIdFail', 'gameIdFail', 3, 10000);
+
+      await expect(casino.cashout(`${BASE_WALLET}_cashout`, 3, 'gameIdInexistent')).rejects.toMatch('Transaction did not succeed: Bet was not found');
+    });
+
+    it("Fail to cashout due to wrong wallet address", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_cashout`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashout`, 2000n * WFAIR.ONE, 3, 'gameIdFailWallet');
+
+      await casino.lockOpenTrades('gameIdFailWallet', 'gameIdFailWallet', 3, 10000);
+
+      await expect(casino.cashout(`${BASE_WALLET}_cashout_wrong`, 3, 'gameIdFailWallet')).rejects.toMatch('Transaction did not succeed: Bet was not found');
+
+    });
+
+    it("Fail to cashout due to reward lower than 1", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_cashout_low`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashout_low`, 2000n * WFAIR.ONE, 3, 'gameIdFailLow');
+
+      await casino.lockOpenTrades('gameIdFailLow', 'gameIdFailLow', 3, 10000);
+
+      await expect(casino.cashout(`${BASE_WALLET}_cashout_low`, 0, 'gameIdFailLow')).rejects.toMatch('Total reward lower than 1: 0');
+
+    });
+  });
+
+  describe("Get Bets", () => {
+    it("Get existing current bet", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_currentBets`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_currentBets`, 2000n * WFAIR.ONE, 3, 'gameIdBetsCurrent');
+      await casino.lockOpenTrades('gameIdBetsCurrent', 'gameIdBetsCurrent', 3, 10000);
+
+      const result = await casino.getBets("gameIdBetsCurrent");
+
+      //Ensure only 1 currentBet is retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(0);
+      expect(result.currentBets).toHaveLength(1);
+    });
+
+    it("Get existing multiple current bets", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_multipleCurrentBets`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_multipleCurrentBets`, 2000n * WFAIR.ONE, 3, 'multipleCurrentBets');
+      await casino.placeTrade(BASE_WALLET, 2000n * WFAIR.ONE, 3, 'multipleCurrentBets');
+
+      await casino.lockOpenTrades('multipleCurrentBets', 'multipleCurrentBets', 3, 10000);
+
+      const result = await casino.getBets("multipleCurrentBets");
+
+      //Ensure multiple currentBets can be retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(0);
+      expect(result.currentBets).toHaveLength(2);
+    });
+
+    it("Get existing upcoming bet", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_upcomingBets`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_upcomingBets`, 2000n * WFAIR.ONE, 3, "gameIdBetsUpcoming");
+
+      const result = await casino.getBets("gameIdBetsUpcoming");
+
+      //Ensure only 1 upcoming bet is retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(1);
+      expect(result.currentBets).toHaveLength(0);
+    });
+
+    it("Get existing upcoming bet without a game", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_upcomingBetsNoGame`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_upcomingBetsNoGame`, 2000n * WFAIR.ONE, 3, 'noGame');
+
+      const result = await casino.getBets(null);
+
+      //Ensure only 1 upcoming bet is retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(1);
+      expect(result.currentBets).toHaveLength(0);
+    });
+
+    it("Get existing multiple upcoming bets", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_multipleupcomingBets`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_multipleupcomingBets`, 2000n * WFAIR.ONE, 3, "gameIdMultipleBetsUpcoming");
+      await casino.placeTrade(BASE_WALLET, 2000n * WFAIR.ONE, 3, "gameIdMultipleBetsUpcoming");
+
+      const result = await casino.getBets("gameIdMultipleBetsUpcoming");
+
+      //Ensure only multiple upcoming bet are retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(2);
+      expect(result.currentBets).toHaveLength(0);
+    });
+
+    it("Get existing cashed out bet", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_cashedOutBet`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashedOutBet`, 2000n * WFAIR.ONE, 3, "cashedOutBet");
+
+      await casino.lockOpenTrades('cashedOutBet', 'cashedOutBet', 3, 10000);
+
+      await casino.cashout(`${BASE_WALLET}_cashedOutBet`, 3, 'cashedOutBet');
+
+      const result = await casino.getBets("cashedOutBet");
+
+      //Ensure only 1 cashedOutBet is retrieved
+      expect(result.cashedOutBets).toHaveLength(1);
+      expect(result.upcomingBets).toHaveLength(0);
+      expect(result.currentBets).toHaveLength(0);
+    });
+
+    it("Get existing multiple cashed out bets", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_multipleCashedOutBet`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_multipleCashedOutBet`, 2000n * WFAIR.ONE, 3, 'multipleCashedOutBet');
+      await casino.placeTrade(BASE_WALLET, 2000n * WFAIR.ONE, 3, 'multipleCashedOutBet');
+
+      await casino.lockOpenTrades('multipleCashedOutBet', 'multipleCashedOutBet', 3, 10000);
+
+      await casino.cashout(`${BASE_WALLET}_multipleCashedOutBet`, 3, 'multipleCashedOutBet');
+      await casino.cashout(BASE_WALLET, 3, 'multipleCashedOutBet');
+
+      const result = await casino.getBets("multipleCashedOutBet");
+
+      //Ensure only multiple cashedOutBets are retrieved
+      expect(result.cashedOutBets).toHaveLength(2);
+      expect(result.upcomingBets).toHaveLength(0);
+      expect(result.currentBets).toHaveLength(0);
+    });
+
+  });
+  describe("Reward winners", () => {
+    it("Successfully reward one winner", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_rewardWinners`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_rewardWinners`, 2000n * WFAIR.ONE, 3, 'rewardWinners');
+
+      await casino.lockOpenTrades('rewardWinners', 'rewardWinners', 5, 10000);
+
+      const result = await casino.rewardWinners("rewardWinners", 5);
+      const winners = result.filter((item) => {
+        return item.state === CASINO_TRADE_STATE.WIN
+      });
+
+      const losers = result.filter((item) => {
+        return item.state === CASINO_TRADE_STATE.LOSS
+      });
+
+      //Expect 1 winner
+      expect(winners).toHaveLength(1);
+      //Expect no loser
+      expect(losers).toHaveLength(0);
+
+      expect(winners[0].reward).toBe(2000n * WFAIR.ONE * 3n);
+    });
+
+    it("Successfully reward multiple winners", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_rewardWinners`, 5000n * WFAIR.ONE);
+      await WFAIR.mint(`${BASE_WALLET}_rewardLoser`, 5000n * WFAIR.ONE);
+      await WFAIR.mint(`${BASE_WALLET}_rewardWinnersTwo`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_rewardWinners`, 2000n * WFAIR.ONE, 3, 'rewardMultipleWinners');
+      await casino.placeTrade(`${BASE_WALLET}_rewardLoser`, 2000n * WFAIR.ONE, 10, 'rewardMultipleWinners');
+      await casino.placeTrade(`${BASE_WALLET}_rewardWinnersTwo`, 2000n * WFAIR.ONE, 4, 'rewardMultipleWinners');
+
+
+      await casino.lockOpenTrades('rewardMultipleWinners', 'rewardMultipleWinners', 5, 10000);
+
+      const result = await casino.rewardWinners("rewardMultipleWinners", 5);
+      const winners = result.filter((item) => {
+        return item.state === CASINO_TRADE_STATE.WIN
+      });
+      const losers = result.filter((item) => {
+        return item.state === CASINO_TRADE_STATE.LOSS
+      });
+
+      //Expect 2 winners
+      expect(winners).toHaveLength(2);
+      //Expect 1 loser
+      expect(losers).toHaveLength(1);
+
+      expect(winners[0].reward).toBe(2000n * WFAIR.ONE * 3n);
+      expect(winners[1].reward).toBe(2000n * WFAIR.ONE * 4n);
+
+    });
+
+    it("Successfully reward one winner", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_rewardWinners`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_rewardWinners`, 2000n * WFAIR.ONE, 10, 'rewardSingleWinner');
+
+      await casino.lockOpenTrades('rewardSingleWinner', 'rewardSingleWinner', 5, 10000);
+
+      const result = await casino.rewardWinners("rewardSingleWinner", 5);
+      const winners = result.filter((item) => {
+        return item.state === CASINO_TRADE_STATE.WIN
+      });
+
+      const losers = result.filter((item) => {
+        return item.state === CASINO_TRADE_STATE.LOSS
+      });
+
+      //Expect no winners
+      expect(winners).toHaveLength(0);
+      //Expect 1 loser
+      expect(losers).toHaveLength(1);
+
+    });
+
+    /**
+    it("Fail to reward winners due to wrong gameHash", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_rewardWinners`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_rewardWinners`, 2000n * WFAIR.ONE, 10);
+
+      await casino.lockOpenTrades('rewardWinnersFail', 'rewardWinnersFail', 5, 10000);
+
+      expect(await casino.rewardWinners("rewardWinnersFail", null)).toHaveLength(0);
+
+    });*/
+  });
 });
