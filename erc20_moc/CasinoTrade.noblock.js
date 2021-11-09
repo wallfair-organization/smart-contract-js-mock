@@ -64,20 +64,36 @@ class CasinoTrade {
 
 
   /**
-   * For simple games, so we can insert all at once to casino_trades
+   * For simple games, so we can insert all at once to casino_trades.
+   * Handle won / lost for single trades
    */
-  placeSingleGameTrade = async (userWalletAddr, stakedAmount, crashFactor, gameId, state, gameHash) => {
+  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash) => {
     const dbClient = await createDBTransaction();
 
     try {
-      // in the same transaction, transfer the funds, and create the casino trade
-      await this.WFAIRToken.transferChain(
-        dbClient,
-        userWalletAddr,
-        this.casinoWalletAddr,
-        stakedAmount
-      );
-      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash);
+      if(state === CASINO_TRADE_STATE.LOSS) {
+        // if user lost, just transfer the funds to casino
+        await this.WFAIRToken.transferChain(
+            dbClient,
+            userWalletAddr,
+            this.casinoWalletAddr,
+            stakedAmount
+        );
+      }
+
+      if(state === CASINO_TRADE_STATE.WIN) {
+        // if user won, stakedamount*multiplier as reward for the user
+        let reward = bigDecimal.multiply(BigInt(stakedAmount), parseFloat(multiplier));
+        const totalReward = BigInt(bigDecimal.round(reward));
+        await this.WFAIRToken.transferChain(
+            dbClient,
+            this.casinoWalletAddr,
+            userWalletAddr,
+            totalReward
+        );
+      }
+
+      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
