@@ -127,7 +127,6 @@ class CasinoTrade {
 
         return { totalReward, stakedAmount };
       } else {
-        await rollbackDBTransaction(dbClient);
         throw `Total reward lower than 1: ${totalReward}`;
       }
     } catch (e) {
@@ -180,7 +179,7 @@ class CasinoTrade {
     const upcomingBets = await getUpcomingBets(gameId)
     const currentBets = await getCurrentBets(gameHash)
 
-    return {cashedOutBets, upcomingBets, currentBets}
+    return { cashedOutBets, upcomingBets, currentBets }
   }
 
   getLuckyWins = async (lastHours, limit, gameId) => await getLuckyBetsInInterval(lastHours, limit, gameId)
