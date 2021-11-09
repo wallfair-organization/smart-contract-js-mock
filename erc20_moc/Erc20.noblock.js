@@ -45,8 +45,8 @@ class ERC20 {
    * @param user {string}
    * @returns {Promise<bigint>}
    */
-  balanceOfChain = async (dbClient, user) => {
-    const results = await getBalanceOfUser(dbClient, user, this.symbol);
+  balanceOfChain = async (dbClient, user, namespace) => {
+    const results = await getBalanceOfUser(dbClient, user, this.symbol, namespace);
     return this._balanceOf(user, results);
   };
 
@@ -58,8 +58,8 @@ class ERC20 {
    * @param user {string}
    * @returns {Promise<bigint>}
    */
-  balanceOfChainForUpdate = async (dbClient, user) => {
-    const results = await getBalanceOfUserForUpdate(dbClient, user, this.symbol);
+  balanceOfChainForUpdate = async (dbClient, user, namespace) => {
+    const results = await getBalanceOfUserForUpdate(dbClient, user, this.symbol, namespace);
     return this._balanceOf(user, results);
   }
 
@@ -69,8 +69,8 @@ class ERC20 {
    * @param user {string}
    * @returns {Promise<bigint>}
    */
-  balanceOf = async (user) => {
-    const results = await viewBalanceOfUser(user, this.symbol);
+  balanceOf = async (user, namespace = 'usr') => {
+    const results = await viewBalanceOfUser(user, this.symbol, namespace);
     return this._balanceOf(user, results);
   };
 
@@ -84,15 +84,14 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  transferChain = async (dbClient, sender, receiver, amount) => {
+  transferChain = async (dbClient, sender, receiver, senderNamespace, receiverNamespace, amount) => {
     if (amount >= 0n) {
-      const trx_time = new Date();
       const senderBalanceRes = await updateBalanceOfUser(
         dbClient,
         sender,
         this.symbol,
-        trx_time,
-        -amount
+        -amount,
+        senderNamespace
       );
       const senderBalance = this._balanceOf(sender, senderBalanceRes);
 
@@ -106,17 +105,8 @@ class ERC20 {
         dbClient,
         receiver,
         this.symbol,
-        trx_time,
-        amount
-      );
-
-      await insertTransaction(
-        dbClient,
-        sender,
-        receiver,
         amount,
-        this.symbol,
-        trx_time
+        receiverNamespace
       );
     } else {
       throw new NoWeb3Exception(
@@ -133,10 +123,10 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  transfer = async (sender, receiver, amount) => {
+  transfer = async (sender, receiver, senderNamespace, receiverNamespace, amount) => {
     const dbClient = await createDBTransaction();
     try {
-      await this.transferChain(dbClient, sender, receiver, amount);
+      await this.transferChain(dbClient, sender, receiver, senderNamespace, receiverNamespace, amount);
       await commitDBTransaction(dbClient);
     } catch (e) {
       await rollbackDBTransaction(dbClient);
@@ -153,24 +143,14 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  mintChain = async (dbClient, receiver, amount) => {
+  mintChain = async (dbClient, receiver, namespace, amount) => {
     if (amount >= 0n) {
-      const trx_time = new Date();
       await updateBalanceOfUser(
         dbClient,
         receiver,
         this.symbol,
-        trx_time,
-        amount
-      );
-
-      await insertTransaction(
-        dbClient,
-        '',
-        receiver,
         amount,
-        this.symbol,
-        trx_time
+        namespace
       );
     } else {
       throw new NoWeb3Exception('Minting negative amounts is not possible!');
@@ -184,10 +164,10 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  mint = async (receiver, amount) => {
+  mint = async (receiver, namespace, amount) => {
     const dbClient = await createDBTransaction();
     try {
-      await this.mintChain(dbClient, receiver, amount);
+      await this.mintChain(dbClient, receiver, namespace, amount);
       await commitDBTransaction(dbClient);
     } catch (e) {
       await rollbackDBTransaction(dbClient);
@@ -204,17 +184,9 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  burnChain = async (dbClient, sponsor, amount) => {
+  burnChain = async (dbClient, sponsor, namespace, amount) => {
     if (amount >= 0n) {
-      const trx_time = new Date();
-      const userBalanceRes = await updateBalanceOfUser(
-        dbClient,
-        sponsor,
-        this.symbol,
-        trx_time,
-        -amount
-      );
-      const userBalance = this._balanceOf(sponsor, userBalanceRes);
+      const userBalance = this.balanceOf(sponsor);
 
       if (userBalance < 0n) {
         throw new NoWeb3Exception(
@@ -222,13 +194,12 @@ class ERC20 {
         );
       }
 
-      await insertTransaction(
+      await updateBalanceOfUser(
         dbClient,
         sponsor,
-        '',
-        amount,
         this.symbol,
-        trx_time
+        -amount,
+        namespace
       );
     } else {
       throw new NoWeb3Exception('Burning negative amounts is not possible!');
@@ -242,10 +213,10 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  burn = async (sponsor, amount) => {
+  burn = async (sponsor, namespace, amount) => {
     const dbClient = await createDBTransaction();
     try {
-      await this.burnChain(dbClient, sponsor, amount);
+      await this.burnChain(dbClient, sponsor, namespace, amount);
       await commitDBTransaction(dbClient);
     } catch (e) {
       await rollbackDBTransaction(dbClient);

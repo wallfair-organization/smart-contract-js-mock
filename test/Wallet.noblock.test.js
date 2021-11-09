@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
+const { setupDatabase, teardownDatabase } = require('./db/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
 const Bet = require('../erc20_moc/Bet.noblock');
 const Wallet = require('../erc20_moc/Wallet.noblock');

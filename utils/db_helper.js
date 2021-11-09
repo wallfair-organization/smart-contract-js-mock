@@ -35,35 +35,11 @@ const BEGIN = 'BEGIN';
 const COMMIT = 'COMMIT';
 const ROLLBACK = 'ROLLBACK';
 
-const CREATE_TOKEN_TRANSACTIONS =
-  'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
-const CREATE_TOKEN_BALANCES =
-  'CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance bigint not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol));';
-const CREATE_BET_REPORTS =
-  'CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome smallint not null, report_timestamp timestamp not null);';
-const CREATE_AMM_INTERACTIONS =
-  'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
-const CREATE_CASINO_MATCHES =
-  'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
-const CREATE_CASINO_TRADES =
-  'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
-
-// ALTER TABLE token_transactions ALTER COLUMN amount TYPE BIGINT;
-// ALTER TABLE token_balances ALTER COLUMN balance TYPE BIGINT;
-
-const TEARDOWN_TOKEN_TRANSACTIONS = 'DROP TABLE token_transactions;';
-const TEARDOWN_TOKEN_BALANCES = 'DROP TABLE token_balances;';
-const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
-const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
-const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
-const TEARDOWN_CASINO_MATCHES = 'DROP TABLE casino_matches';
-
-const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
-const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2 FOR UPDATE;';
-const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
-const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
-const GET_LIMIT_BALANCE_OF_TOKEN =
-  'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY owner, balance DESC LIMIT $2;';
+const GET_PLATFORM_USER_BALANCE = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3 LIMIT 1;`;
+const GET_BALANCE_OF_USER = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3;`;
+const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT balance FROM account WHERE symbol = $1 AND owner_account = $2 AND account_namespace = $3 FOR UPDATE;';
+const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM account WHERE owner = $1;';
+const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM account WHERE symbol = $1 AND balance > 0;';
 
 const GET_TRANSACTIONS_OF_USER =
   'SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1);';
@@ -80,7 +56,7 @@ const GET_BET_INVESTORS =
   'SELECT buyer, direction, SUM(investmentamount) AS amount FROM amm_interactions WHERE bet = $1 GROUP BY buyer, direction;';
 
 const UPDATE_BALANCE_OF_USER =
-  'INSERT INTO token_balances (owner, symbol, last_update, balance) VALUES($1, $2, $3, $4) ON CONFLICT (owner, symbol) DO UPDATE SET last_update = $3, balance = token_balances.balance + $4 RETURNING balance;';
+  'UPDATE account SET balance = balance + $3 WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $4 RETURNING balance;';
 const INSERT_TOKEN_TRANSACTION =
   'INSERT INTO token_transactions(sender, receiver, amount, symbol, trx_timestamp) VALUES($1, $2, $3, $4, $5);';
 const INSERT_AMM_INTERACTION =
@@ -178,30 +154,6 @@ async function getConnection() {
 }
 
 /**
- * @returns {Promise<void>}
- */
-async function setupDatabase() {
-  await pool.query(CREATE_TOKEN_TRANSACTIONS);
-  await pool.query(CREATE_TOKEN_BALANCES);
-  await pool.query(CREATE_BET_REPORTS);
-  await pool.query(CREATE_AMM_INTERACTIONS);
-  await pool.query(CREATE_CASINO_MATCHES);
-  await pool.query(CREATE_CASINO_TRADES);
-}
-
-/**
- * @returns {Promise<void>}
- */
-async function teardownDatabase() {
-  await pool.query(TEARDOWN_TOKEN_TRANSACTIONS);
-  await pool.query(TEARDOWN_TOKEN_BALANCES);
-  await pool.query(TEARDOWN_BET_REPORTS);
-  await pool.query(TEARDOWN_AMM_INTERACTIONS);
-  await pool.query(TEARDOWN_CASINO_TRADES);
-  await pool.query(TEARDOWN_CASINO_MATCHES);
-}
-
-/**
  * @returns {Promise<Client>}
  */
 async function createDBTransaction() {
@@ -237,8 +189,8 @@ async function rollbackDBTransaction(client) {
  * @param symbol {String}
  * @returns {Promise<*>}
  */
-async function getBalanceOfUser(client, user, symbol) {
-  const res = await client.query(GET_BALANCE_OF_USER, [symbol, user]);
+async function getBalanceOfUser(client, user, symbol, namespace) {
+  const res = await client.query(GET_BALANCE_OF_USER, [symbol, user, namespace]);
   return res.rows;
 }
 
@@ -251,8 +203,8 @@ async function getBalanceOfUser(client, user, symbol) {
  * @param symbol {String}
  * @returns {Promise<*>}
  */
-async function getBalanceOfUserForUpdate(client, user, symbol) {
-  const res = await client.query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user]);
+async function getBalanceOfUserForUpdate(client, user, symbol, namespace) {
+  const res = await client.query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user, namespace]);
   return res.rows;
 }
 
@@ -263,8 +215,8 @@ async function getBalanceOfUserForUpdate(client, user, symbol) {
  * @param symbol {String}
  * @returns {Promise<*>}
  */
-async function viewBalanceOfUser(user, symbol) {
-  const res = await pool.query(GET_BALANCE_OF_USER, [symbol, user]);
+async function viewBalanceOfUser(user, symbol, namespace) {
+  const res = await pool.query(GET_PLATFORM_USER_BALANCE, [user, symbol, namespace]);
   return res.rows;
 }
 
@@ -328,18 +280,6 @@ async function viewAllBalancesOfToken(symbol) {
 }
 
 /**
- * View the balance of a specific token
- *
- * @param symbol {String}
- * @param limit {number}
- * @returns {Promise<*>}
- */
-async function viewLimitBalancesOfToken(symbol, limit) {
-  const res = await pool.query(GET_LIMIT_BALANCE_OF_TOKEN, [symbol, limit]);
-  return res.rows;
-}
-
-/**
  * Update the balance of a specific token from a user
  * Build for Transactions
  *
@@ -350,8 +290,8 @@ async function viewLimitBalancesOfToken(symbol, limit) {
  * @param newBalance {bigint}
  * @returns {Promise<void>}
  */
-async function updateBalanceOfUser(client, user, symbol, timestamp, amount) {
-  const res = await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, amount]);
+async function updateBalanceOfUser(client, user, symbol, amount, namespace) {
+  const res = await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, amount, namespace]);
   return res.rows;
 }
 
@@ -931,8 +871,6 @@ module.exports = {
   pool,
   DIRECTION,
   CASINO_TRADE_STATE,
-  setupDatabase,
-  teardownDatabase,
   createDBTransaction,
   commitDBTransaction,
   rollbackDBTransaction,
@@ -944,7 +882,6 @@ module.exports = {
   viewAllBalancesOfUser,
   getAllBalancesOfToken,
   viewAllBalancesOfToken,
-  viewLimitBalancesOfToken,
   updateBalanceOfUser,
   insertTransaction,
   insertAMMInteraction,

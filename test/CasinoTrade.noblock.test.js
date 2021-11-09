@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
+const { setupDatabase, teardownDatabase } = require('./db/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
 const Casino = require('../erc20_moc/CasinoTrade.noblock');
 
@@ -16,7 +16,7 @@ beforeAll(async () => await setupDatabase());
 afterAll(async () => await teardownDatabase());
 
 beforeEach(async () => {
-  await WFAIR.mint(casinoWallet, liquidityAmount);
+  await WFAIR.mint(casinoWallet, 'cas', liquidityAmount);
 });
 
 test('Run a game', async () => {
@@ -24,7 +24,7 @@ test('Run a game', async () => {
 
   for (let i = 1; i <= 5; i++) {
     // mint players with 5000 WFAIR balance
-    await WFAIR.mint(`${BASE_WALLET}_${i}`, 5000n * WFAIR.ONE);
+    await WFAIR.mint(`${BASE_WALLET}_${i}`, 'cas', 5000n * WFAIR.ONE);
 
     // each player places a trade
     await casino.placeTrade(`${BASE_WALLET}_${i}`, 2000n * WFAIR.ONE, 999, 'gameId');

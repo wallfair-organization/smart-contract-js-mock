@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { setupDatabase, teardownDatabase } = require('../utils/db_helper');
+const { setupDatabase, teardownDatabase, resetBetState } = require('./db/db_helper');
 const ERC20 = require('../erc20_moc/Erc20.noblock');
 const Bet = require('../erc20_moc/Bet.noblock');
 
@@ -16,7 +16,8 @@ beforeAll(async () => await setupDatabase());
 afterAll(async () => await teardownDatabase());
 
 beforeEach(async () => {
-  await WFAIR.mint(liquidityProviderWallet, liquidityAmount);
+  await WFAIR.mint(liquidityProviderWallet, 'bet', liquidityAmount);
+  await resetBetState();
 });
 
 test('Add Liquidity', async () => {
@@ -45,7 +46,7 @@ test('Add Liquidity with hint, equal split, 4 outcomes', async () => {
   // this hint is compatible with 25%:25%:25%:25%
   const hint = [25n, 25n, 25n, 25n];
 
-  await WFAIR.mint(liquidityWalletId, liquidity);
+  await WFAIR.mint(liquidityWalletId, 'bet', liquidity);
 
   const bet = new Bet(testBetId, 4);
   await bet.addLiquidity(liquidityWalletId, liquidity, hint);
@@ -88,7 +89,7 @@ test('Add Liquidity with hint, non equal split, 3 outcomes', async () => {
   // those hints have same effect (same proportions)
   const hintPerc = probToHint([25n, 25n, 50n]);
 
-  await WFAIR.mint(liquidityWalletId, liquidity);
+  await WFAIR.mint(liquidityWalletId, 'bet', liquidity);
 
   const bet = new Bet(testBetId, 3);
   // set fee to 0 to not impact the prices
@@ -135,7 +136,7 @@ test("Add liquidity, binary market 90%:10%", async () => {
   // those hints have same effect (same proportions)
   const hint = probToHint([90n, 10n]);
 
-  await WFAIR.mint(liquidityWalletId, liquidity);
+  await WFAIR.mint(liquidityWalletId, 'bet', liquidity);
 
   const bet = new Bet(testBetId, 2);
   // set fee to 0 to not impact the prices
@@ -162,7 +163,7 @@ test("Add liqudity in active market should not change prices", async () => {
   // those hints have same effect (same proportions)
   const hintPerc = probToHint([35n, 25n, 40n]);
 
-  await WFAIR.mint(liquidityWalletId, liquidity);
+  await WFAIR.mint(liquidityWalletId, 'bet', liquidity);
 
   const bet = new Bet(testBetId, 3);
   bet.fee = 0.0
@@ -177,7 +178,7 @@ test("Add liqudity in active market should not change prices", async () => {
   }
 
   // provide a lot of liquidity, if it's not provided correctly that will disturb the prices
-  await WFAIR.mint(liquidityWalletId, 6251n * WFAIR.ONE);
+  await WFAIR.mint(liquidityWalletId, 'bet', 6251n * WFAIR.ONE);
   // hints not allowed for established markets
   // TODO: migrate from jest to chai before it's not too late, use chai-as-promise
   // await expect(bet.addLiquidity(liquidityWalletId, 516251n * WFAIR.ONE, hintPerc)).to.eventually.be.rejectedWith(Error);
@@ -192,7 +193,7 @@ test("Add liqudity in active market should not change prices", async () => {
 
   // investors buy and change prices
   const investorWalletId = String(Math.random());
-  await WFAIR.mint(investorWalletId, 1000000n * WFAIR.ONE);
+  await WFAIR.mint(investorWalletId, 'bet', 1000000n * WFAIR.ONE);
   await bet.buy(investorWalletId, 2121n * WFAIR.ONE, 0, 1n);
   await bet.buy(investorWalletId, 1121n * WFAIR.ONE, 1, 1n);
   await bet.buy(investorWalletId, 4611n * WFAIR.ONE, 2, 1n);
@@ -205,7 +206,7 @@ test("Add liqudity in active market should not change prices", async () => {
   }
 
   // add liquidity again
-  await WFAIR.mint(liquidityWalletId, 126251n * WFAIR.ONE);
+  await WFAIR.mint(liquidityWalletId, 'bet', 126251n * WFAIR.ONE);
   await bet.addLiquidity(liquidityWalletId, 126251n * WFAIR.ONE);
   for (let o = 0; o < 3; o += 1) {
     const expectedOutcomeTokens = await bet.calcBuy(1n * WFAIR.ONE, o);
@@ -220,13 +221,13 @@ test("Cannot buy all outcome tokens", async () => {
   const liquidityWalletId = String(Math.random());
   const liquidity = 100n * WFAIR.ONE;
 
-  await WFAIR.mint(liquidityWalletId, liquidity);
+  await WFAIR.mint(liquidityWalletId, 'bet', liquidity);
 
   const bet = new Bet(testBetId, 3);
   await bet.addLiquidity(liquidityWalletId, liquidity);
 
   const investorWalletId = String(Math.random());
-  await WFAIR.mint(investorWalletId, 1000000n * WFAIR.ONE);
+  await WFAIR.mint(investorWalletId, 'bet', 1000000n * WFAIR.ONE);
   await bet.buy(investorWalletId, 1000000n * WFAIR.ONE, 0, 1n);
 
   const pools = await bet.getPoolBalances()
@@ -279,7 +280,7 @@ test('Buy Outcome Tokens', async () => {
   const testBetId = 'buyOutcomeTokens';
   const investorWalletId = 'buyOutcomeTokensInvestor';
 
-  await WFAIR.mint(investorWalletId, investAmount);
+  await WFAIR.mint(investorWalletId, 'bet', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -299,8 +300,8 @@ test('Buy Outcome Tokens - custom amounts', async () => {
   const liquidityAmount = 214748n * WFAIR.ONE;
   const customInvestAmount = 299999n * WFAIR.ONE;
 
-  await WFAIR.mint(investorWalletId, investorMintAmount);
-  await WFAIR.mint(liquidityProviderWallet, liquidityAmount);
+  await WFAIR.mint(investorWalletId, 'bet', investorMintAmount);
+  await WFAIR.mint(liquidityProviderWallet, 'bet', liquidityAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -318,7 +319,7 @@ test('Buy and Sell Outcome Tokens', async () => {
   const testBetId = 'buyAndSellOutcomeTokens';
   const investorWalletId = 'buyAndSellOutcomeTokensInvestor';
 
-  await WFAIR.mint(investorWalletId, investAmount);
+  await WFAIR.mint(investorWalletId, 'bet', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -350,7 +351,7 @@ test('Buy and Sell Returns', async () => {
   const testBetId = 'buyAndSellReturns';
   const investorWalletId = 'buyAndSellReturnsInvestor';
 
-  await WFAIR.mint(investorWalletId, investAmount);
+  await WFAIR.mint(investorWalletId, 'bet', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -395,8 +396,8 @@ test('Buy and Sell from Amount', async () => {
   const outcomeIndex1 = 0;
   const outcomeIndex2 = 1;
 
-  await WFAIR.mint(investorWalletId, investAmount);
-  await WFAIR.mint(investorWalletId, investAmount);
+  await WFAIR.mint(investorWalletId, 'bet', investAmount);
+  await WFAIR.mint(investorWalletId, 'bet', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -433,16 +434,16 @@ test('Buy and Sell from Amount', async () => {
 });
 
 test('Test Payout', async () => {
-  const testBetId = 'testPayout';
-  const singlePayoutWallet = 'singlePayoutWallet';
+  const testBetId = 'testBetId';
+  const singlePayoutWallet = '615bf607f04fbb15aa5dd367';
   const outcomeIndex = 0;
 
   const bet = new Bet(testBetId, 1);
 
-  await WFAIR.mint(bet.walletId, investAmount);
+  await WFAIR.mint(bet.walletId, 'bet', investAmount);
   await bet
     .getOutcomeToken(outcomeIndex)
-    .mint(singlePayoutWallet, investAmount);
+    .mint(singlePayoutWallet, 'bet', investAmount);
 
   await bet.resolveBet('testPayout', outcomeIndex);
   await bet.getPayout(singlePayoutWallet);
@@ -450,36 +451,17 @@ test('Test Payout', async () => {
   expect(await WFAIR.balanceOf(singlePayoutWallet)).toBe(investAmount);
 });
 
-test('Test batched Payout', async () => {
-  const testBetId = 'testBatchedPayout';
-  const investorWalletId1 = 'batchedPayoutWallet1';
-  const investorWalletId2 = 'batchedPayoutWallet2';
-  const outcomeIndex = 0;
-
-  const bet = new Bet(testBetId, 1);
-
-  await WFAIR.mint(bet.walletId, 2n * investAmount);
-  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId1, investAmount);
-  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId2, investAmount);
-
-  await bet.resolveBet('testBatchedPayout', outcomeIndex);
-  await bet.getBatchedPayout([investorWalletId1, investorWalletId2]);
-
-  expect(await WFAIR.balanceOf(investorWalletId1)).toBe(investAmount);
-  expect(await WFAIR.balanceOf(investorWalletId2)).toBe(investAmount);
-});
-
 test('Test resolve and batched Payout', async () => {
-  const testBetId = 'testResolveAndBatchedPayout';
-  const investorWalletId1 = 'resolveAndBatchedPayoutWallet1';
-  const investorWalletId2 = 'resolveAndBatchedPayoutWallet2';
+  const testBetId = 'testBetId';
+  const investorWalletId1 = '615bf607f04fbb15aa5dd367';
+  const investorWalletId2 = '615bfb7df04fbb15aa5dd368';
   const outcomeIndex = 0;
 
   const bet = new Bet(testBetId, 1);
 
-  await WFAIR.mint(bet.walletId, 2n * investAmount);
-  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId1, investAmount);
-  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId2, investAmount);
+  await WFAIR.mint(bet.walletId, 'bet', 2n * investAmount);
+  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId1, 'bet', investAmount);
+  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId2, 'bet', investAmount);
 
   await bet.resolveAndPayout('testBatchedPayout', outcomeIndex);
 
@@ -494,9 +476,9 @@ test('Test Refund Bet', async () => {
   const investorWalletId3 = 'testRefundWallet3';
   const outcomeIndex = 0;
 
-  await WFAIR.mint(investorWalletId1, investAmount);
-  await WFAIR.mint(investorWalletId2, investAmount);
-  await WFAIR.mint(investorWalletId3, investAmount);
+  await WFAIR.mint(investorWalletId1, 'bet', investAmount);
+  await WFAIR.mint(investorWalletId2, 'bet', investAmount);
+  await WFAIR.mint(investorWalletId3, 'bet', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -543,7 +525,7 @@ test('Test Refund Bet', async () => {
 });
 
 async function prepareAMMInteractions(betId, wallet) {
-  await WFAIR.mint(wallet, investAmount * 2n);
+  await WFAIR.mint(wallet, 'bet', investAmount * 2n);
 
   const bet = new Bet(betId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -661,12 +643,15 @@ test('Get AMM Interactions summary for specific direction and end date', async (
 });
 
 test('Test Weird Jonas Case', async () => {
-  const testBetId = 'JonasBet';
+  const testBetId = 'testBetId';
 
   const bet = new Bet(testBetId, 2);
 
-  await bet.getOutcomeToken(0).mint(bet.walletId, 2146490114n);
-  await bet.getOutcomeToken(1).mint(bet.walletId, 2147480000n);
+  await bet.getOutcomeToken(0).mint(bet.walletId, 'bet', 2146490114n);
+  await bet.getOutcomeToken(1).mint(bet.walletId, 'bet', 2147480000n);
 
+  const balance = await bet.getOutcomeToken(0).balanceOf(bet.walletId, 'bet');
+
+  debugger
   expect(await bet.calcSellFromAmount(989886n, 0)).toBe(490100n);
 });

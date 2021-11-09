@@ -145,7 +145,7 @@ class Bet {
     const balances = {};
     const tokens = this.getOutcomeTokens();
     for (const token of tokens) {
-      balances[token.symbol] = await token.balanceOf(userId);
+      balances[token.symbol] = await token.balanceOf(userId, 'bet');
     }
     return balances;
   };
@@ -162,7 +162,7 @@ class Bet {
     const balances = {};
     const tokens = this.getOutcomeTokens();
     for (const token of tokens) {
-      balances[token.symbol] = await token.balanceOfChain(dbClient, userId);
+      balances[token.symbol] = await token.balanceOfChain(dbClient, userId, 'bet');
     }
     return balances;
   };
@@ -416,6 +416,7 @@ class Bet {
    */
   calcSellFromAmount = async (sellAmount, outcome) => {
     const poolBalances = await this.getPoolBalances();
+    debugger
     return this._calcSellFromAmountOfBalance(poolBalances, sellAmount, outcome);
   };
 
@@ -712,9 +713,9 @@ class Bet {
    * @private
    */
   _payoutChain = async (dbClient, outcomeToken, beneficiary) => {
-    const outcomeBalance = await outcomeToken.balanceOfChainForUpdate(dbClient, beneficiary);
-    await outcomeToken.burnChain(dbClient, beneficiary, outcomeBalance);
-    await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, outcomeBalance);
+    const outcomeBalance = await outcomeToken.balanceOfChainForUpdate(dbClient, beneficiary, 'bet');
+    await outcomeToken.burnChain(dbClient, beneficiary, 'bet', outcomeBalance);
+    await this.collateralToken.transferChain(dbClient, this.walletId, beneficiary, 'bet', 'usr', outcomeBalance);
 
     await insertAMMInteraction(
       dbClient,
@@ -822,39 +823,6 @@ class Bet {
   /**
    * Complete the Payout for a Batch of Users
    *
-   * @param beneficiaries {string[]}
-   * @returns {Promise<void>}
-   */
-  getBatchedPayout = async (beneficiaries) => {
-    if (!(await this.isResolved())) {
-      throw new NoWeb3Exception('The Bet is not resolved yet!');
-    }
-
-    const outcome = (await this.getResult())['outcome'];
-
-    if (outcome === OUTCOME_BET_REFUNDED) {
-      throw new NoWeb3Exception('The Bet has been refunded!');
-    }
-
-    const outcomeToken = this.getOutcomeTokens()[outcome];
-
-    const dbClient = await createDBTransaction();
-
-    try {
-      for (const beneficiary of beneficiaries) {
-        await this._payoutChain(dbClient, outcomeToken, beneficiary);
-      }
-
-      await commitDBTransaction(dbClient);
-    } catch (e) {
-      await rollbackDBTransaction(dbClient);
-      throw e;
-    }
-  };
-
-  /**
-   * Complete the Payout for a Batch of Users
-   *
    * @param reporter {string}
    * @param outcome {number}
    * @returns {Promise<void>}
@@ -880,7 +848,7 @@ class Bet {
     await insertReportChain(dbClient, this.betId, reporter, outcome, new Date());
 
     const results = await getAllBalancesOfToken(dbClient, this.getOutcomeKey(outcome));
-    const beneficiaries = results.map((x) => x.owner);
+    const beneficiaries = results.map((x) => x.owner_account);
 
     try {
       for (const beneficiary of beneficiaries) {
