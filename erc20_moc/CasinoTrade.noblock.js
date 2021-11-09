@@ -29,7 +29,8 @@ const {
   getPrevMatchByGameHash,
   setLostTrades,
   getOpenTrade,
-  countTradesByLastXHours
+  countTradesByLastXHours,
+  insertCasinoSingleGameTrade
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -53,6 +54,30 @@ class CasinoTrade {
         stakedAmount
       );
       await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId);
+
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+
+  /**
+   * For simple games, so we can insert all at once to casino_trades
+   */
+  placeSingleGameTrade = async (userWalletAddr, stakedAmount, crashFactor, gameId, state, gameHash) => {
+    const dbClient = await createDBTransaction();
+
+    try {
+      // in the same transaction, transfer the funds, and create the casino trade
+      await this.WFAIRToken.transferChain(
+        dbClient,
+        userWalletAddr,
+        this.casinoWalletAddr,
+        stakedAmount
+      );
+      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
