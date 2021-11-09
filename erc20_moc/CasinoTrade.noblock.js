@@ -67,7 +67,7 @@ class CasinoTrade {
    * For simple games, so we can insert all at once to casino_trades.
    * Handle won / lost for single trades
    */
-  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash) => {
+  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash, riskFactor) => {
     const dbClient = await createDBTransaction();
 
     try {
@@ -93,7 +93,7 @@ class CasinoTrade {
         );
       }
 
-      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash);
+      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash, riskFactor);
 
       await commitDBTransaction(dbClient);
     } catch (e) {

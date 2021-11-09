@@ -94,7 +94,7 @@ const INSERT_CASINO_MATCH =
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
-  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash) VALUES ($1, $2, $3, $4, $5, $6);';
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor) VALUES ($1, $2, $3, $4, $5, $6, $7);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
@@ -403,14 +403,15 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
  * @param stakedAmount {Number}
  * @param gameId {String}
  */
-async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash) {
+async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor) {
   await client.query(INSERT_CASINO_SINGLE_GAME_TRADE, [
     userWalletAddr,
     crashFactor,
     stakedAmount,
     state,
     gameId,
-    gameHash
+    gameHash,
+    riskFactor
   ]);
 }
 
