@@ -28,7 +28,7 @@
   ],
   "dependencies": {
     "js-big-decimal": "^1.3.4",
-    "@wallfair.io/wallfair-commons": "^1.7.18"
+    "@wallfair.io/wallfair-commons": "^1.8.0"
   },
   "devDependencies": {
     "babel-eslint": "^10.1.0",
