@@ -74,23 +74,27 @@ class CasinoTrade {
 
     try {
       const parsedMultiplier = parseFloat(multiplier);
-      // lock funds
-      await this.WFAIRToken.transferChain(
-           dbClient,
-           userWalletAddr,
-           this.casinoWalletAddr,
-           stakedAmount
-      );
+      let reward = bigDecimal.multiply(BigInt(stakedAmount), parsedMultiplier);
+      const totalReward = BigInt(bigDecimal.round(reward));
+      const difference = totalReward - stakedAmount;
 
-      if(parsedMultiplier > 0) {
-        // if multipley greater than 0, send back the amount*multiplier
-        let reward = bigDecimal.multiply(BigInt(stakedAmount), parseFloat(multiplier));
-        const totalReward = BigInt(bigDecimal.round(reward));
+      if(difference < 0) {
+        const amount = BigInt(bigDecimal.negate(difference));
+        // lock rest funds
         await this.WFAIRToken.transferChain(
-            dbClient,
-            this.casinoWalletAddr,
-            userWalletAddr,
-            totalReward
+          dbClient,
+          userWalletAddr,
+          this.casinoWalletAddr,
+          amount
+        );
+      } else {
+        const amount = BigInt(difference);
+
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          this.casinoWalletAddr,
+          userWalletAddr,
+          amount
         );
       }
 
