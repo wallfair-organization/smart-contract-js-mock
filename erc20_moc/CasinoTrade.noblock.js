@@ -1,11 +1,12 @@
 const ERC20 = require('./Erc20.noblock');
 const bigDecimal = require('js-big-decimal');
-
+const {
+  createDBTransaction,
+  commitDBTransaction,
+  rollbackDBTransaction
+} = require('@wallfair.io/wallfair-commons').utils;
 const {
   CASINO_TRADE_STATE,
-  createDBTransaction,
-  rollbackDBTransaction,
-  commitDBTransaction,
   insertCasinoTrade,
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
