@@ -73,25 +73,28 @@ class CasinoTrade {
     const dbClient = await createDBTransaction();
 
     try {
-      if(state === CASINO_TRADE_STATE.LOSS) {
-        // if user lost, just transfer the funds to casino
-        await this.WFAIRToken.transferChain(
-            dbClient,
-            userWalletAddr,
-            this.casinoWalletAddr,
-            stakedAmount
-        );
-      }
+      const parsedMultiplier = parseFloat(multiplier);
+      let reward = bigDecimal.multiply(BigInt(stakedAmount), parsedMultiplier);
+      const totalReward = BigInt(bigDecimal.round(reward));
+      const difference = totalReward - stakedAmount;
 
-      if(state === CASINO_TRADE_STATE.WIN) {
-        // if user won, stakedamount*multiplier as reward for the user
-        let reward = bigDecimal.multiply(BigInt(stakedAmount), parseFloat(multiplier));
-        const totalReward = BigInt(bigDecimal.round(reward));
+      if(difference < 0) {
+        const amount = BigInt(bigDecimal.negate(difference));
+        // lock rest funds
         await this.WFAIRToken.transferChain(
-            dbClient,
-            this.casinoWalletAddr,
-            userWalletAddr,
-            totalReward
+          dbClient,
+          userWalletAddr,
+          this.casinoWalletAddr,
+          amount
+        );
+      } else {
+        const amount = BigInt(difference);
+
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          this.casinoWalletAddr,
+          userWalletAddr,
+          amount
         );
       }
 
