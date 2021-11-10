@@ -116,6 +116,7 @@ const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
+const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
@@ -740,8 +741,15 @@ async function getLatestPriceActions(betId) {
 
 /**
  * Get upcoming bets (open bets)
+ *
+ * @param gameId {String}
+ *
  */
-async function getUpcomingBets() {
+async function getUpcomingBets(gameId) {
+  if(gameId){
+    const res = await pool.query(GET_OPEN_TRADES_BY_GAME, [gameId])
+    return res.rows
+  }
   const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
   return res.rows;
 }
