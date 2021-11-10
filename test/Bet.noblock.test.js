@@ -142,9 +142,9 @@ test("Add liquidity, binary market 90%:10%", async () => {
   // prices must be like in binary market
   // YES price NO/(YES + NO) = NO/100 so rev 100/NO
   // add 1 to correct for slippage
-  expect(pricesRev[0] + 1n).toEqual((100n * WFAIR.ONE / hint[1]))
+  expect(pricesRev[0] + 1n).toEqual((100n * WFAIR.ONE / hint[1]));
   // same for NO
-  expect(pricesRev[1]).toEqual((100n * WFAIR.ONE / hint[0]))
+  expect(pricesRev[1]).toEqual((100n * WFAIR.ONE / hint[0]));
 });
 
 test("Add liqudity in active market should not change prices", async () => {
@@ -509,27 +509,39 @@ test('Test resolve and batched Payout', async () => {
 });
 
 test('Test Refund Bet', async () => {
-  const testBetId = 'testRefundBet';
-  const investorWalletId1 = 'testRefundWallet1';
-  const investorWalletId2 = 'testRefundWallet2';
-  const investorWalletId3 = 'testRefundWallet3';
+  const testBetId = await createBetWithOutcomes(2);
+  const investorWalletId1 = randomString();
+  const investorWalletId2 = randomString();
+  const investorWalletId3 = randomString();
+  const liquidityProviderWallet = await createLiquidity();
+  const liquidityAmount = 100n * WFAIR.ONE;
+
+  await createAccount('usr', investorWalletId1, 'WFAIR', 0);
+  await createAccount('usr', investorWalletId2, 'WFAIR', 0);
+  await createAccount('usr', investorWalletId3, 'WFAIR', 0);
   const outcomeIndex = 0;
 
-  await WFAIR.mint(investorWalletId1, 'bet', investAmount);
-  await WFAIR.mint(investorWalletId2, 'bet', investAmount);
-  await WFAIR.mint(investorWalletId3, 'bet', investAmount);
+  await WFAIR.mint(liquidityProviderWallet, 'eth', liquidityAmount);
+  await WFAIR.mint(investorWalletId1, 'usr', investAmount);
+  await WFAIR.mint(investorWalletId2, 'usr', investAmount);
+  await WFAIR.mint(investorWalletId3, 'usr', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
+
+  await createAccount('bet', investorWalletId1, `${outcomeIndex}_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId2, `${outcomeIndex}_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId3, `${outcomeIndex}_${testBetId}`, 0);
 
   await bet.buy(investorWalletId1, investAmount, outcomeIndex, 1n);
 
   expect(await WFAIR.balanceOf(investorWalletId1)).toBe(0n);
   expect(
-    await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId1)
+    await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId1, 'bet')
   ).toBeGreaterThan(0n);
 
   await bet.buy(investorWalletId2, investAmount, outcomeIndex, 1n);
+
   await bet.sell(
     investorWalletId2,
     investAmount / 2n,
@@ -539,10 +551,10 @@ test('Test Refund Bet', async () => {
 
   expect(await WFAIR.balanceOf(investorWalletId2)).toBe(investAmount / 2n);
   expect(
-    await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId2)
+    await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId2, 'bet')
   ).toBeGreaterThan(0n);
 
-  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId3, investAmount);
+  await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId3, 'bet', investAmount);
   await bet.buy(investorWalletId3, investAmount, outcomeIndex, 1n);
   await bet.sell(
     investorWalletId3,
@@ -553,7 +565,7 @@ test('Test Refund Bet', async () => {
 
   expect(await WFAIR.balanceOf(investorWalletId3)).toBe(investAmount + bet.ONE);
   expect(
-    await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId3)
+    await bet.getOutcomeToken(outcomeIndex).balanceOf(investorWalletId3, 'bet')
   ).toBeGreaterThan(0n);
 
   await bet.refund();
@@ -564,7 +576,10 @@ test('Test Refund Bet', async () => {
 });
 
 async function prepareAMMInteractions(betId, wallet) {
-  await WFAIR.mint(wallet, 'bet', investAmount * 2n);
+  const liquidityProviderWallet = await createLiquidity();
+  const liquidityAmount = 100n * WFAIR.ONE;
+  await WFAIR.mint(liquidityProviderWallet, 'eth', liquidityAmount);
+  await WFAIR.mint(wallet, 'usr', investAmount * 2n);
 
   const bet = new Bet(betId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -580,8 +595,12 @@ async function prepareAMMInteractions(betId, wallet) {
 }
 
 test('Get User AMM Aggregated Interactions', async () => {
-  const testBetId = 'getAmmInteractionsBet';
-  const investorWalletId1 = 'wallet1';
+  const testBetId = await createBetWithOutcomes(2);
+  const investorWalletId1 = randomString();
+  await createAccount('usr', investorWalletId1, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId1, `0_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId1, `1_${testBetId}`, 0);
+
   const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
 
   const ammInteractions = await bet.getUserAmmInteractions();
@@ -599,8 +618,11 @@ test('Get User AMM Aggregated Interactions', async () => {
 });
 
 test('Get All AMM Interactions', async () => {
-  const testBetId = 'getBetInteractions';
-  const investorWalletId1 = 'wallet1';
+  const testBetId = await createBetWithOutcomes(2);
+  const investorWalletId1 = randomString();
+  await createAccount('usr', investorWalletId1, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId1, `0_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId1, `1_${testBetId}`, 0);
   const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
 
   const ammInteractions = await bet.getBetInteractions();
@@ -629,8 +651,11 @@ test('Get All AMM Interactions', async () => {
 });
 
 test('Get AMM Interactions for specific direction and with start date', async () => {
-  const testBetId = 'getBetInteractionsSpecificDirection';
-  const investorWalletId1 = 'wallet1';
+  const testBetId = await createBetWithOutcomes(2);
+  const investorWalletId1 = randomString();
+  await createAccount('usr', investorWalletId1, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId1, `0_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId1, `1_${testBetId}`, 0);
   const direction = 'BUY';
   const startDate = new Date('2021-01-01');
   const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
@@ -659,8 +684,11 @@ test('Get AMM Interactions for specific direction and with start date', async ()
 });
 
 test('Get AMM Interactions summary for specific direction and end date', async () => {
-  const testBetId = 'getBetInteractionsSummartSpecificDirection';
-  const investorWalletId1 = 'wallet1';
+  const testBetId = await createBetWithOutcomes(2);
+  const investorWalletId1 = randomString();
+  await createAccount('usr', investorWalletId1, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId1, `0_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId1, `1_${testBetId}`, 0);
   const direction = 'BUY';
   const endDate = new Date('2021-12-12');
   const bet = await prepareAMMInteractions(testBetId, investorWalletId1);
