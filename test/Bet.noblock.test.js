@@ -332,12 +332,13 @@ test('Buy and Sell Outcome Tokens', async () => {
   const testBetId = await createBetWithOutcomes(2);
   const liquidityProviderWallet = await createLiquidity();
   const investorWalletId = randomString();
-  const investorAmount = 100n * WFAIR.ONE;
+  const investorAmount = 10n * WFAIR.ONE;
 
   await createAccount('usr', investorWalletId, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId, `0_${testBetId}`, 0);
 
   await WFAIR.mint(liquidityProviderWallet, 'eth', liquidityAmount);
-  await WFAIR.mint(investorWalletId, 'usr', liquidityAmount / 2n);
+  await WFAIR.mint(investorWalletId, 'usr', investorAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
@@ -346,8 +347,10 @@ test('Buy and Sell Outcome Tokens', async () => {
   await bet.buy(investorWalletId, investorAmount, 0, 1n);
 
   expect(
-    await WFAIR.balanceOf(investorWalletId, 'usr')
+    await bet.getOutcomeToken(0).balanceOf(investorWalletId, 'bet')
   ).toBeGreaterThan(expectedOutcomeTokens - 10n);
+
+  await bet.getPoolBalances();
 
   const expectedOutcomeTokensToSell = await bet.calcSell(5n * WFAIR.ONE, 0);
   await bet.sell(
@@ -357,10 +360,10 @@ test('Buy and Sell Outcome Tokens', async () => {
     expectedOutcomeTokensToSell + 1n
   );
 
-  expect(await WFAIR.balanceOf(investorWalletId, 'usr')).toBeLessThan(
+  expect(await WFAIR.balanceOf(investorWalletId)).toBeLessThan(
     expectedOutcomeTokensToSell
   );
-  expect(await WFAIR.balanceOf(investorWalletId, 'usr')).toBe(
+  expect(await bet.getOutcomeToken(0).balanceOf(investorWalletId, 'bet')).toBe(
     expectedOutcomeTokens - expectedOutcomeTokensToSell
   );
 });
@@ -370,15 +373,19 @@ test('Buy and Sell Returns', async () => {
   const liquidityProviderWallet = await createLiquidity();
   const investorWalletId = randomString();
   await createAccount('usr', investorWalletId, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId, `0_${testBetId}`, 0);
 
-  await WFAIR.mint(investorWalletId, 'bet', investAmount);
+  await WFAIR.mint(liquidityProviderWallet, 'eth', liquidityAmount);
+  await WFAIR.mint(investorWalletId, 'usr', investAmount);
 
   const bet = new Bet(testBetId, 2);
   await bet.addLiquidity(liquidityProviderWallet, liquidityAmount);
 
   const expectedOutcomeTokens = await bet.calcBuy(investAmount, 0);
   const resultBuy = await bet.buy(investorWalletId, investAmount, 0, 1n);
-  const newBalanceAfterBuy = await WFAIR.balanceOf(investorWalletId, 'usr');
+  const newBalanceAfterBuy = await bet
+    .getOutcomeToken(0)
+    .balanceOf(investorWalletId, 'bet');
 
   expect(newBalanceAfterBuy).toBeGreaterThan(expectedOutcomeTokens - 10n);
   expect(resultBuy[bet.getOutcomeToken(0).symbol]).toBe(newBalanceAfterBuy);
@@ -390,15 +397,18 @@ test('Buy and Sell Returns', async () => {
     newBalanceAfterBuy,
     0
   );
-  const resultSell = await bet.sell(
+
+  const resultSell = await bet.sellAmount(
     investorWalletId,
     newBalanceAfterBuy,
     0,
     0n
   );
-  const newBalanceAfterSell = await WFAIR.balanceOf(investorWalletId);
+  const newBalanceAfterSell = await bet
+    .getOutcomeToken(0)
+    .balanceOf(investorWalletId, 'bet');
 
-  expect(await WFAIR.balanceOf(investorWalletId, 'usr')).toBe(expectedReturnAmount);
+  expect(await WFAIR.balanceOf(investorWalletId)).toBe(expectedReturnAmount);
   expect(newBalanceAfterSell).toBe(0n);
   expect(resultSell[bet.getOutcomeToken(0).symbol]).toBe(newBalanceAfterSell);
   expect(resultSell.soldOutcomeTokens).toBe(expectedOutcomeTokens);
@@ -411,10 +421,13 @@ test('Buy and Sell from Amount', async () => {
   const liquidityProviderWallet = await createLiquidity();
   const investorWalletId = randomString();
   await createAccount('usr', investorWalletId, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId, `0_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId, `1_${testBetId}`, 0);
 
   const outcomeIndex1 = 0;
   const outcomeIndex2 = 1;
 
+  await WFAIR.mint(liquidityProviderWallet, 'eth', liquidityAmount);
   await WFAIR.mint(investorWalletId, 'usr', investAmount);
   await WFAIR.mint(investorWalletId, 'usr', investAmount);
 
@@ -431,24 +444,24 @@ test('Buy and Sell from Amount', async () => {
   await bet.buy(investorWalletId, investAmount, outcomeIndex2, 1n);
 
   expect(
-    await WFAIR.balanceOf(investorWalletId, 'usr')
+    await bet.getOutcomeToken(outcomeIndex1).balanceOf(investorWalletId, 'bet')
   ).toBe(expectedOutcomeTokens);
   expect(
-    await WFAIR.balanceOf(investorWalletId, 'usr')
+    await bet.getOutcomeToken(outcomeIndex2).balanceOf(investorWalletId, 'bet')
   ).toBe(expectedOutcomeTokensNo);
 
   const expectedReturnAmount = await bet.calcSellFromAmount(
     expectedOutcomeTokens,
     0
   );
-  await bet.sell(investorWalletId, expectedOutcomeTokens, 0, 0n);
+  await bet.sellAmount(investorWalletId, expectedOutcomeTokens, 0, 0n);
 
-  expect(await WFAIR.balanceOf(investorWalletId, 'usr')).toBe(expectedReturnAmount);
+  expect(await WFAIR.balanceOf(investorWalletId)).toBe(expectedReturnAmount);
   expect(
-    await WFAIR.balanceOf(investorWalletId, 'usr')
+    await bet.getOutcomeToken(outcomeIndex1).balanceOf(investorWalletId, 'bet')
   ).toBe(0n);
   expect(
-    await WFAIR.balanceOf(investorWalletId, 'usr')
+    await bet.getOutcomeToken(outcomeIndex2).balanceOf(investorWalletId, 'bet')
   ).toBe(expectedOutcomeTokensNo);
 });
 
@@ -457,6 +470,7 @@ test('Test Payout', async () => {
   const investorWalletId = randomString();
   await createAccount('usr', investorWalletId, 'WFAIR', 0);
   const outcomeIndex = 0;
+  await createAccount('bet', investorWalletId, `${outcomeIndex}_${testBetId}`, 0);
 
   const bet = new Bet(testBetId, 1);
 
@@ -480,6 +494,9 @@ test('Test resolve and batched Payout', async () => {
 
   const outcomeIndex = 0;
   const bet = new Bet(testBetId, 1);
+
+  await createAccount('bet', investorWalletId1, `${outcomeIndex}_${testBetId}`, 0);
+  await createAccount('bet', investorWalletId2, `${outcomeIndex}_${testBetId}`, 0);
 
   await WFAIR.mint(bet.walletId, 'bet', 2n * investAmount);
   await bet.getOutcomeToken(outcomeIndex).mint(investorWalletId1, 'bet', investAmount);

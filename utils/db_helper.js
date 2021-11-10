@@ -190,7 +190,7 @@ async function rollbackDBTransaction(client) {
  * @returns {Promise<*>}
  */
 async function getBalanceOfUser(client, user, symbol, namespace) {
-  const res = await client.query(GET_BALANCE_OF_USER, [symbol, user, namespace]);
+  const res = await client.query(GET_BALANCE_OF_USER, [user, symbol, namespace]);
   return res.rows;
 }
 

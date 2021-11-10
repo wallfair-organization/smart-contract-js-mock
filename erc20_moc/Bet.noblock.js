@@ -518,7 +518,7 @@ class Bet {
       }
 
       // send out the outcome tokens to the buyer
-      await outcomeToken.transferChain(dbClient, this.walletId, buyer, 'bet', 'usr', outcomeTokensToBuy);
+      await outcomeToken.transferChain(dbClient, this.walletId, buyer, 'bet', 'bet', outcomeTokensToBuy);
 
       await insertAMMInteraction(
         dbClient,
@@ -570,7 +570,7 @@ class Bet {
       if (outcomeTokensToSell > maxOutcomeTokensToSell) {
         throw new NoWeb3Exception('Maximum sell amount surpassed');
       }
-      await outcomeToken.transferChain(dbClient, seller, this.walletId, 'usr', 'bet', outcomeTokensToSell);
+      await outcomeToken.transferChain(dbClient, seller, this.walletId, 'bet', 'bet', outcomeTokensToSell);
 
       await this.collateralToken.transferChain(dbClient, this.walletId, seller, 'bet', 'usr', returnAmount);
       await this.collateralToken.transferChain(
@@ -637,7 +637,7 @@ class Bet {
         throw new NoWeb3Exception('Minimum return amount not reached');
       }
 
-      await outcomeToken.transferChain(dbClient, seller, this.walletId, 'usr', 'bet', sellAmount);
+      await outcomeToken.transferChain(dbClient, seller, this.walletId, 'bet', 'bet', sellAmount);
       await this.collateralToken.transferChain(dbClient, this.walletId, seller, 'bet', 'usr', returnAmount);
       await this.collateralToken.transferChain(
         dbClient,
