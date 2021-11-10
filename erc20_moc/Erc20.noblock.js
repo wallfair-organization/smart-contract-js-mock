@@ -2,7 +2,6 @@ const {
   createDBTransaction,
   commitDBTransaction,
   rollbackDBTransaction,
-  insertTransaction,
   getBalanceOfUser,
   getBalanceOfUserForUpdate,
   viewBalanceOfUser,
@@ -84,7 +83,7 @@ class ERC20 {
    * @param amount {bigint}
    * @returns {Promise<void>}
    */
-  transferChain = async (dbClient, sender, receiver, senderNamespace, receiverNamespace, amount) => {
+  transferChain = async (dbClient, sender, receiver, senderNamespace, receiverNamespace, amount, _symbol) => {
     if (amount >= 0n) {
       const senderBalanceRes = await updateBalanceOfUser(
         dbClient,
@@ -104,7 +103,7 @@ class ERC20 {
       await updateBalanceOfUser(
         dbClient,
         receiver,
-        this.symbol,
+        _symbol || this.symbol,
         amount,
         receiverNamespace
       );

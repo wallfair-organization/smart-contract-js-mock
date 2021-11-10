@@ -35,7 +35,7 @@ class Bet {
   constructor(betId, outcomes) {
     this.betId = betId;
     this.fee = 0.01;
-    this.walletId = WALLET_PREFIX + betId;
+    this.walletId = betId;
     this.feeWalletId = FEE_WALLET_PREFIX + betId;
     this.outcomes = outcomes || 2;
     this.collateralToken = new ERC20(COLLATERAL_TOKEN);
@@ -215,12 +215,14 @@ class Bet {
         if (hints.length !== this.outcomes) {
           throw new Error(`BET-ID: ${this.walletId}: number of hints ${hints.length} !== number of outcomes ${this.outcomes}`);
         }
+
         sendBacksAmounts = {}
-        // hint was present so calculate sendBacks
         const maxHint = Object.values(hints).reduce((p, c) => c > p ? c : p, 0n);
+
         if (maxHint === 0n) {
           throw new Error(`BET-ID: ${this.walletId}: invalid distribution hint, max value is 0`);
         }
+
         for (let o = 0; o < hints.length; o += 1) {
           const remaining = (amount * hints[o]) / maxHint;
           if (remaining <= 0n) {
@@ -232,12 +234,12 @@ class Bet {
       }
       // TODO: implement a method to transfer several tokens in one call (like batch transfer)
       // get the collateral from provides
-      await this.collateralToken.transferChain(dbClient, provider, this.walletId, amount);
+      await this.collateralToken.transferChain(dbClient, provider, this.walletId, 'eth', 'bet', amount);
 
       // always mint the `amount` of every outcome tokens
       const tokens = this.getOutcomeTokens();
       for (const token of tokens) {
-        await token.mintChain(dbClient, this.walletId, amount);
+        await token.mintChain(dbClient, this.walletId, 'bet', amount);
       }
 
       // send back the tokens to make the market (new market) / keep the price constant (further adds)
@@ -245,8 +247,7 @@ class Bet {
         for (const [o, a] of Object.entries(sendBacksAmounts)) {
           if (a > 0n) {
             const token = new ERC20(this.getOutcomeKey(o));
-            // console.log(`TX back ${o}: ${a}`);
-            await token.transferChain(dbClient, this.walletId, provider, a);
+            await token.transferChain(dbClient, this.walletId, provider, 'bet', 'eth', a, 'WFAIR');
           }
         }
       }
@@ -416,7 +417,6 @@ class Bet {
    */
   calcSellFromAmount = async (sellAmount, outcome) => {
     const poolBalances = await this.getPoolBalances();
-    debugger
     return this._calcSellFromAmountOfBalance(poolBalances, sellAmount, outcome);
   };
 
@@ -502,21 +502,23 @@ class Bet {
         throw new NoWeb3Exception('Minimum buy amount not reached');
       }
 
-      await this.collateralToken.transferChain(dbClient, buyer, this.walletId, investmentAmount);
+      await this.collateralToken.transferChain(dbClient, buyer, this.walletId, 'usr', 'bet', investmentAmount);
       await this.collateralToken.transferChain(
         dbClient,
         this.walletId,
         this.feeWalletId,
+        'bet',
+        'bet',
         feeAmount
       );
 
       // mint new outcome tokens that correspond to increased collateral value
       for (const token of tokens) {
-        await token.mintChain(dbClient, this.walletId, investmentAmount - feeAmount);
+        await token.mintChain(dbClient, this.walletId, 'bet', investmentAmount - feeAmount);
       }
 
       // send out the outcome tokens to the buyer
-      await outcomeToken.transferChain(dbClient, this.walletId, buyer, outcomeTokensToBuy);
+      await outcomeToken.transferChain(dbClient, this.walletId, buyer, 'bet', 'usr', outcomeTokensToBuy);
 
       await insertAMMInteraction(
         dbClient,
@@ -568,19 +570,21 @@ class Bet {
       if (outcomeTokensToSell > maxOutcomeTokensToSell) {
         throw new NoWeb3Exception('Maximum sell amount surpassed');
       }
-      await outcomeToken.transferChain(dbClient, seller, this.walletId, outcomeTokensToSell);
+      await outcomeToken.transferChain(dbClient, seller, this.walletId, 'usr', 'bet', outcomeTokensToSell);
 
-      await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
+      await this.collateralToken.transferChain(dbClient, this.walletId, seller, 'bet', 'usr', returnAmount);
       await this.collateralToken.transferChain(
         dbClient,
         this.walletId,
         this.feeWalletId,
+        'bet',
+        'bet',
         feeAmount
       );
 
       // burn the outcome token corresponding to decreased collateral value
       for (const token of tokens) {
-        await token.burnChain(dbClient, this.walletId, returnAmount + feeAmount);
+        await token.burnChain(dbClient, this.walletId, 'bet', returnAmount + feeAmount);
       }
 
       await insertAMMInteraction(
@@ -633,12 +637,14 @@ class Bet {
         throw new NoWeb3Exception('Minimum return amount not reached');
       }
 
-      await outcomeToken.transferChain(dbClient, seller, this.walletId, sellAmount);
-      await this.collateralToken.transferChain(dbClient, this.walletId, seller, returnAmount);
+      await outcomeToken.transferChain(dbClient, seller, this.walletId, 'usr', 'bet', sellAmount);
+      await this.collateralToken.transferChain(dbClient, this.walletId, seller, 'bet', 'usr', returnAmount);
       await this.collateralToken.transferChain(
         dbClient,
         this.walletId,
         this.feeWalletId,
+        'bet',
+        'bet',
         feeAmount
       );
 
@@ -797,7 +803,7 @@ class Bet {
       for (const beneficiary in beneficiaries) {
         const refundAmount = beneficiaries[beneficiary];
         if (refundAmount > 0) {
-          await this.collateralToken.mintChain(dbClient, beneficiary, refundAmount);
+          await this.collateralToken.mintChain(dbClient, beneficiary, 'usr', refundAmount);
 
           await insertAMMInteraction(
             dbClient,

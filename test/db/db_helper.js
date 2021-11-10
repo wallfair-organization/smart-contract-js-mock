@@ -27,11 +27,12 @@ const CREATE_CASINO_MATCHES =
   'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
 const CREATE_CASINO_TRADES =
   'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
-const CREATE_ACCOUNT =
-  `CREATE TABLE "account" ("owner_account" character varying NOT NULL, "account_namespace" "public"."account_namespace_enum" NOT NULL, "symbol" character varying NOT NULL, "balance" numeric(18,0) NOT NULL, CONSTRAINT "PK_8ec3dedb1ee17a8630a7c57b0f9" PRIMARY KEY ("owner_account", "account_namespace", "symbol"));` +
+const CREATE_ACCOUNT_NAMESPACE_ENUM = `CREATE TYPE account_namespace_enum AS ENUM('usr', 'eth', 'bet', 'tdl', 'cas')`;
+const CREATE_ACCOUNTS =
+  `CREATE TABLE IF NOT EXISTS "account" ("owner_account" character varying NOT NULL, "account_namespace" "public"."account_namespace_enum" NOT NULL, "symbol" character varying NOT NULL, "balance" numeric(18,0) NOT NULL, CONSTRAINT "PK_8ec3dedb1ee17a8630a7c57b0f9" PRIMARY KEY ("owner_account", "account_namespace", "symbol"));` +
   `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('usr', '615bf607f04fbb15aa5dd367', 'WFAIR', 0);` +
   `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('usr', '615bfb7df04fbb15aa5dd368', 'WFAIR', 0);` +
-  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'liquidity_provider', 'WFAIR', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('eth', 'liquidity_provider', 'WFAIR', 0);` +
   `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'testBetId', 'WFAIR', 0);` +
   `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'testBetId', '0_testBetId', 0);` +
   `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'testBetId', '1_testBetId', 0);` +
@@ -43,6 +44,7 @@ const DELETE_BET_REPORTS =
   'DELETE FROM bet_reports';
 const RESET_BALANCES =
   `UPDATE account SET balance = 0 WHERE owner_account IN ('testBetId', '0_testBetId', '615bf607f04fbb15aa5dd367', '615bfb7df04fbb15aa5dd368')`;
+const CREATE_ACCOUNT = `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ($1, $2, $3, $4);`
 
 const TEARDOWN_TOKEN_TRANSACTIONS = 'DROP TABLE token_transactions;';
 const TEARDOWN_TOKEN_BALANCES = 'DROP TABLE token_balances;';
@@ -50,6 +52,7 @@ const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
 const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
 const TEARDOWN_CASINO_MATCHES = 'DROP TABLE casino_matches';
+const TEARDOWN_ACCOUNT_NAMESPACE_ENUM = 'DROP TYPE account_namespace_enum';
 const TEARDOWN_ACCOUNT = 'DROP TABLE account';
 const TEARDOWN_USER_ACCOUNT = 'DROP TABLE user_account';
 
@@ -63,8 +66,13 @@ async function setupDatabase() {
   await pool.query(CREATE_AMM_INTERACTIONS);
   await pool.query(CREATE_CASINO_MATCHES);
   await pool.query(CREATE_CASINO_TRADES);
-  await pool.query(CREATE_ACCOUNT);
+  await pool.query(CREATE_ACCOUNT_NAMESPACE_ENUM);
+  await pool.query(CREATE_ACCOUNTS);
   await pool.query(CREATE_USER_ACCOUNT);
+}
+
+async function createAccount(namespace, owner, symbol, balance) {
+  await pool.query(CREATE_ACCOUNT, [namespace, owner, symbol, balance]);
 }
 
 /**
@@ -79,6 +87,7 @@ async function teardownDatabase() {
   await pool.query(TEARDOWN_CASINO_MATCHES);
   await pool.query(TEARDOWN_ACCOUNT);
   await pool.query(TEARDOWN_USER_ACCOUNT);
+  await pool.query(TEARDOWN_ACCOUNT_NAMESPACE_ENUM);
 }
 
 async function resetBetState() {
@@ -90,4 +99,5 @@ module.exports = {
   setupDatabase,
   teardownDatabase,
   resetBetState,
+  createAccount
 }
