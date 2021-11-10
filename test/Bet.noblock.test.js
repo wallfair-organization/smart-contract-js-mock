@@ -221,11 +221,12 @@ test("Cannot buy all outcome tokens", async () => {
   const bet = new Bet(testBetId, 3);
   await bet.addLiquidity(liquidityProviderWallet, liquidity);
 
-  const investorWalletId = String(Math.random());
+  const investorWalletId = randomString();
   await createAccount('usr', investorWalletId, 'WFAIR', 0);
+  await createAccount('bet', investorWalletId, `${0}_${testBetId}`, 0);
 
-  await WFAIR.mint(investorWalletId, 'usr', 1000n * WFAIR.ONE);
-  await bet.buy(investorWalletId, 1000n * WFAIR.ONE, 0, 1n);
+  await WFAIR.mint(investorWalletId, 'usr', 1000000n * WFAIR.ONE);
+  await bet.buy(investorWalletId, 1000000n * WFAIR.ONE, 0, 1n);
 
   const pools = await bet.getPoolBalances();
   // at least 1 `wei` of token stays
