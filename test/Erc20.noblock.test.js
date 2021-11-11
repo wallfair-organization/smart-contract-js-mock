@@ -210,21 +210,100 @@ describe("ERC 20", () => {
     });
   });
 
+  describe('Burn Tokens', () => {
+    it('Sucessfully burn Tokens', async () => {
+      const tokensToMint = 1000n;
+      const testBurnWallet = 'sucessfullyBurnWallet';
+      const tokensToBurn = 100n;
+      const symbol = 'WFAIR';
+      const transaction = {
+        sender: testBurnWallet,
+        receiver: '',
+        amount: tokensToBurn,
+        symbol: symbol
+      };
+      const WFAIR = new ERC20(symbol);
 
+      await WFAIR.mint(testBurnWallet, tokensToMint);
+      await WFAIR.burn(testBurnWallet, tokensToBurn);
 
+      //Check the balance of the user has been updated
+      expect(await WFAIR.balanceOf(testBurnWallet)).toBe(tokensToMint - tokensToBurn);
 
-  test('Burn Tokens', async () => {
-    const tokensToMint = 1000n;
-    const tokensToBurn = 100n;
-    const testBurnWallet = 'testBurn';
+      //There should be 2 transactions, one for the mint and one for the burn
+      const resultTransaction = await viewTransactionOfUser(testBurnWallet);
+      expect(resultTransaction).toHaveLength(2);
+      expect(resultTransaction[1]).toEqual(expect.objectContaining(transaction));
+    });
 
-    const WFAIR = new ERC20('WFAIR');
+    it('Sucessfully burn huge amount of Tokens', async () => {
+      const tokensToMint = BigInt(Number.MAX_SAFE_INTEGER * 100);
+      const testBurnWallet = 'sucessfullyBurnHugeWallet';
+      const tokensToBurn = BigInt(Number.MAX_SAFE_INTEGER * 99);
+      const symbol = 'WFAIR';
+      const transaction = {
+        sender: testBurnWallet,
+        receiver: '',
+        amount: tokensToBurn,
+        symbol: symbol
+      };
+      const WFAIR = new ERC20(symbol);
 
-    await WFAIR.mint(testBurnWallet, tokensToMint);
-    await WFAIR.burn(testBurnWallet, tokensToBurn);
+      await WFAIR.mint(testBurnWallet, tokensToMint);
+      await WFAIR.burn(testBurnWallet, tokensToBurn);
 
-    expect(await WFAIR.balanceOf(testBurnWallet)).toBe(
-      tokensToMint - tokensToBurn
-    );
+      //Check the balance of the user has been updated
+      expect(await WFAIR.balanceOf(testBurnWallet)).toBe(tokensToMint - tokensToBurn);
+
+      //There should be 2 transactions, one for the mint and one for the burn
+      const resultTransaction = await viewTransactionOfUser(testBurnWallet);
+      expect(resultTransaction).toHaveLength(2);
+      expect(resultTransaction[1]).toEqual(expect.objectContaining(transaction));
+    });
+
+    it('Validate the owner doesnt have enough funds to burn ', async () => {
+      const tokensToMint = 1000n;
+      const testBurnWallet = 'negativeAmountFundsBurnWallet';
+      const tokensToBurn = 1001n;
+      const symbol = 'WFAIR';
+      const WFAIR = new ERC20(symbol);
+
+      await WFAIR.mint(testBurnWallet, tokensToMint);
+      await expect(WFAIR.burn(testBurnWallet, tokensToBurn))
+        .rejects.toBeInstanceOf(NoWeb3Exception);
+
+      //Check the balance of the user hasn't been updated
+      expect(await WFAIR.balanceOf(testBurnWallet)).toBe(tokensToMint);
+
+      //There should be only the mint transaction, one for the mint and one for the burn
+      const resultTransaction = await viewTransactionOfUser(testBurnWallet);
+      expect(resultTransaction).toHaveLength(1);
+
+      //Mint transactions should have an empty sender
+      expect(resultTransaction[0]).toEqual(expect.objectContaining({ sender: '' }));
+    });
+
+    it('Validate the amount provided is negative', async () => {
+      const tokensToMint = 1000n;
+      const testBurnWallet = 'insufficientOwnerFundsBurnWallet';
+      const tokensToBurn = -999n;
+      const symbol = 'WFAIR';
+      const WFAIR = new ERC20(symbol);
+
+      await WFAIR.mint(testBurnWallet, tokensToMint);
+      await expect(WFAIR.burn(testBurnWallet, tokensToBurn))
+        .rejects.toBeInstanceOf(NoWeb3Exception);
+
+      //Check the balance of the user hasn't been updated
+      expect(await WFAIR.balanceOf(testBurnWallet)).toBe(tokensToMint);
+
+      //There should be only the mint transaction, one for the mint and one for the burn
+      const resultTransaction = await viewTransactionOfUser(testBurnWallet);
+      expect(resultTransaction).toHaveLength(1);
+
+      //Mint transactions should have an empty sender
+      expect(resultTransaction[0]).toEqual(expect.objectContaining({ sender: '' }));
+    });
   });
+
 });
