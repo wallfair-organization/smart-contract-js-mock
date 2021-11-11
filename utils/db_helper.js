@@ -98,6 +98,8 @@ const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
 const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
 const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE =
   `SELECT * FROM casino_trades WHERE gameId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
+const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID =
+  `SELECT * FROM casino_trades WHERE gameId = $1 AND userId = $2 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $3;`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
@@ -907,15 +909,20 @@ async function countTradesByLastXHours(lastHours = 24) {
 }
 
 /**
- * get last X trades based on gameId
+ * get last X trades based on gameId or optional userId
  * PostgreSQL
  *
  * @param gameId {String} - gameTypeId
  * @param limit {String}
  *
  */
-async function getLastCasinoTradesByGameType(gameId, limit = 10) {
-  const res = await pool.query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE, [gameId, limit]);
+async function getLastCasinoTradesByGameType(gameId, userId, limit = 10) {
+  let res = null;
+  if(userId) {
+    res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID, [gameId, userId, limit]);
+  } else {
+    res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE, [gameId, limit]);
+  }
   return res.rows;
 }
 

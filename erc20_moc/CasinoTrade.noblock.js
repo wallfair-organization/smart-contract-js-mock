@@ -254,7 +254,7 @@ class CasinoTrade {
 
   countTradesByLastXHours = async (lastHours) => countTradesByLastXHours(lastHours)
 
-  getLastCasinoTradesByGameType = async (gameId, limit) => getLastCasinoTradesByGameType(gameId, limit)
+  getLastCasinoTradesByGameType = async (gameId, userId, limit) => getLastCasinoTradesByGameType(gameId, userId, limit)
 }
 
 module.exports = CasinoTrade;
