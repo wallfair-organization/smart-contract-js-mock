@@ -96,6 +96,8 @@ const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
+const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE =
+  `SELECT * FROM casino_trades WHERE gameId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
@@ -904,6 +906,19 @@ async function countTradesByLastXHours(lastHours = 24) {
   return res.rows;
 }
 
+/**
+ * get last X trades based on gameId
+ * PostgreSQL
+ *
+ * @param gameId {String} - gameTypeId
+ * @param limit {String}
+ *
+ */
+async function getLastCasinoTradesByGameType(gameId, limit = 10) {
+  const res = await pool.query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE, [gameId, limit]);
+  return res.rows;
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -959,5 +974,6 @@ module.exports = {
   setLostTrades,
   getOpenTrade,
   countTradesByLastXHours,
-  insertCasinoSingleGameTrade
+  insertCasinoSingleGameTrade,
+  getLastCasinoTradesByGameType
 };
