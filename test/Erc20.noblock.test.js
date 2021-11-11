@@ -10,7 +10,7 @@ afterAll(async () => await teardownDatabase());
 describe("ERC 20", () => {
 
   describe("Mint tokens", () => {
-    //To check with Mussi, transaction returns amount as string
+
     it('Sucessfully mint Tokens', async () => {
       const tokensToMint = 1000n;
       const testMintWallet = 'testMint';
@@ -23,14 +23,19 @@ describe("ERC 20", () => {
       };
       const WFAIR = new ERC20(symbol);
 
+      //mint twice
       await WFAIR.mint(testMintWallet, tokensToMint);
-      //Check the balance of the user has been updated
-      expect(await WFAIR.balanceOf(testMintWallet)).toBe(tokensToMint);
+      await WFAIR.mint(testMintWallet, tokensToMint);
 
-      //Check if the transaction has been properly recorded
+      //Check the balance of the user has been updated
+      expect(await WFAIR.balanceOf(testMintWallet)).toBe(tokensToMint * 2n);
+
+      //Check if both mint transactions have been recorded correctly
       const resultTransaction = await viewTransactionOfUser(testMintWallet);
-      expect(resultTransaction).toHaveLength(1);
+      expect(resultTransaction).toHaveLength(2);
       expect(resultTransaction[0]).toEqual(expect.objectContaining(transaction));
+      expect(resultTransaction[1]).toEqual(expect.objectContaining(transaction));
+
     });
 
     it('Sucessfully mint huge number of Tokens', async () => {
