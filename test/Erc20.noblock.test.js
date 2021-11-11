@@ -107,7 +107,7 @@ describe("ERC 20", () => {
 
       const resultTransaction = await viewTransactionOfUser(testSenderWallet);
 
-      //Validate the transaction is created and with correct content
+      //Sender should have 2 transactions, one for the mint and one for the transfer
       expect(resultTransaction).toHaveLength(2);
       expect(resultTransaction[1]).toEqual(expect.objectContaining(transaction));
 
@@ -141,11 +141,11 @@ describe("ERC 20", () => {
       const resultTransactionSender = await viewTransactionOfUser(testSenderWallet);
       const resultTransactionReceiver = await viewTransactionOfUser(testReceiverWallet);
 
-      //Validate the transaction is created and with correct content for the sender
+      //Sender should have 2 transactions, one for the mint and one for the transfer
       expect(resultTransactionSender).toHaveLength(2);
       expect(resultTransactionSender[1]).toEqual(expect.objectContaining(transaction));
 
-      //Validate the transaction is created and with correct content for the sender
+      //Receiver should only have 1 transaction related the transfer
       expect(resultTransactionReceiver).toHaveLength(1);
       expect(resultTransactionReceiver[0]).toEqual(expect.objectContaining(transaction));
 
