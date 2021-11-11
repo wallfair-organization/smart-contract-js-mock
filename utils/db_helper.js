@@ -156,24 +156,24 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
  * @returns {Promise<void>}
  */
 async function setupDatabase() {
-  await client.query(CREATE_TOKEN_TRANSACTIONS);
-  await client.query(CREATE_TOKEN_BALANCES);
-  await client.query(CREATE_BET_REPORTS);
-  await client.query(CREATE_AMM_INTERACTIONS);
-  await client.query(CREATE_CASINO_MATCHES);
-  await client.query(CREATE_CASINO_TRADES);
+  (await client).query(CREATE_TOKEN_TRANSACTIONS);
+  (await client).query(CREATE_TOKEN_BALANCES);
+  (await client).query(CREATE_BET_REPORTS);
+  (await client).query(CREATE_AMM_INTERACTIONS);
+  (await client).query(CREATE_CASINO_MATCHES);
+  (await client).query(CREATE_CASINO_TRADES);
 }
 
 /**
  * @returns {Promise<void>}
  */
 async function teardownDatabase() {
-  await client.query(TEARDOWN_TOKEN_TRANSACTIONS);
-  await client.query(TEARDOWN_TOKEN_BALANCES);
-  await client.query(TEARDOWN_BET_REPORTS);
-  await client.query(TEARDOWN_AMM_INTERACTIONS);
-  await client.query(TEARDOWN_CASINO_TRADES);
-  await client.query(TEARDOWN_CASINO_MATCHES);
+  (await client).query(TEARDOWN_TOKEN_TRANSACTIONS);
+  (await client).query(TEARDOWN_TOKEN_BALANCES);
+  (await client).query(TEARDOWN_BET_REPORTS);
+  (await client).query(TEARDOWN_AMM_INTERACTIONS);
+  (await client).query(TEARDOWN_CASINO_TRADES);
+  (await client).query(TEARDOWN_CASINO_MATCHES);
 }
 
 /**
@@ -186,7 +186,7 @@ async function teardownDatabase() {
  * @returns {Promise<*>}
  */
 async function getBalanceOfUser(client, user, symbol) {
-  const res = await client.query(GET_BALANCE_OF_USER, [symbol, user]);
+  const res = (await client).query(GET_BALANCE_OF_USER, [symbol, user]);
   return res.rows;
 }
 
@@ -200,7 +200,7 @@ async function getBalanceOfUser(client, user, symbol) {
  * @returns {Promise<*>}
  */
 async function getBalanceOfUserForUpdate(client, user, symbol) {
-  const res = await client.query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user]);
+  const res = (await client).query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user]);
   return res.rows;
 }
 
@@ -212,7 +212,7 @@ async function getBalanceOfUserForUpdate(client, user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewBalanceOfUser(user, symbol) {
-  const res = await client.query(GET_BALANCE_OF_USER, [symbol, user]);
+  const res = (await client).query(GET_BALANCE_OF_USER, [symbol, user]);
   return res.rows;
 }
 
@@ -223,7 +223,7 @@ async function viewBalanceOfUser(user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewAMMInteractionsOfUser(user) {
-  const res = await client.query(GET_ALL_AMM_INTERACTIONS_OF_USER, [user]);
+  const res = (await client).query(GET_ALL_AMM_INTERACTIONS_OF_USER, [user]);
   return res.rows;
 }
 
@@ -236,7 +236,7 @@ async function viewAMMInteractionsOfUser(user) {
  * @returns {Promise<*>}
  */
 async function getAllBalancesOfUser(client, user) {
-  const res = await client.query(GET_ALL_BALANCE_OF_USER, [user]);
+  const res = (await client).query(GET_ALL_BALANCE_OF_USER, [user]);
   return res.rows;
 }
 
@@ -247,7 +247,7 @@ async function getAllBalancesOfUser(client, user) {
  * @returns {Promise<*>}
  */
 async function viewAllBalancesOfUser(user) {
-  const res = await client.query(GET_ALL_BALANCE_OF_USER, [user]);
+  const res = (await client).query(GET_ALL_BALANCE_OF_USER, [user]);
   return res.rows;
 }
 
@@ -260,7 +260,7 @@ async function viewAllBalancesOfUser(user) {
  * @returns {Promise<*>}
  */
 async function getAllBalancesOfToken(client, symbol) {
-  const res = await client.query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
+  const res = (await client).query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
   return res.rows;
 }
 
@@ -271,7 +271,7 @@ async function getAllBalancesOfToken(client, symbol) {
  * @returns {Promise<*>}
  */
 async function viewAllBalancesOfToken(symbol) {
-  const res = await client.query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
+  const res = (await client).query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
   return res.rows;
 }
 
@@ -283,7 +283,7 @@ async function viewAllBalancesOfToken(symbol) {
  * @returns {Promise<*>}
  */
 async function viewLimitBalancesOfToken(symbol, limit) {
-  const res = await client.query(GET_LIMIT_BALANCE_OF_TOKEN, [symbol, limit]);
+  const res = (await client).query(GET_LIMIT_BALANCE_OF_TOKEN, [symbol, limit]);
   return res.rows;
 }
 
@@ -299,7 +299,7 @@ async function viewLimitBalancesOfToken(symbol, limit) {
  * @returns {Promise<void>}
  */
 async function updateBalanceOfUser(client, user, symbol, timestamp, amount) {
-  const res = await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, amount]);
+  const res = (await client).query(UPDATE_BALANCE_OF_USER, [user, symbol, timestamp, amount]);
   return res.rows;
 }
 
@@ -316,7 +316,7 @@ async function updateBalanceOfUser(client, user, symbol, timestamp, amount) {
  * @returns {Promise<void>}
  */
 async function insertTransaction(client, sender, receiver, amount, symbol, timestamp) {
-  await client.query(INSERT_TOKEN_TRANSACTION, [sender, receiver, amount, symbol, timestamp]);
+  (await client).query(INSERT_TOKEN_TRANSACTION, [sender, receiver, amount, symbol, timestamp]);
 }
 
 /**
@@ -330,7 +330,7 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @param gameId {String}
  */
 async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId) {
-  await client.query(INSERT_CASINO_TRADE, [
+  (await client).query(INSERT_CASINO_TRADE, [
     userWalletAddr,
     crashFactor,
     stakedAmount,
@@ -350,7 +350,7 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
  * @param gameId {String}
  */
 async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor) {
-  await client.query(INSERT_CASINO_SINGLE_GAME_TRADE, [
+  (await client).query(INSERT_CASINO_SINGLE_GAME_TRADE, [
     userWalletAddr,
     crashFactor,
     stakedAmount,
@@ -369,7 +369,7 @@ async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, 
  * @param tradeId  {String}
  */
 async function cancelCasinoTrade(client, tradeId) {
-  return await client.query(CANCEL_CASINO_TRADE, [
+  return (await client).query(CANCEL_CASINO_TRADE, [
     tradeId
   ]);
 }
@@ -383,7 +383,7 @@ async function cancelCasinoTrade(client, tradeId) {
  * @returns
  */
 async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
-  return await client.query(SET_CASINO_TRADE_STATE, [
+  return (await client).query(SET_CASINO_TRADE_STATE, [
     CASINO_TRADE_STATE.WIN,
     crashFactor,
     gameHash,
@@ -397,9 +397,9 @@ async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
  *
  */
 async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS) {
-  let res = await client.query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
+  let res = (await client).query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
   let matchId = res.rows[0].id;
-  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
+  (await client).query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
 }
 
 /**
@@ -410,7 +410,7 @@ async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameL
  * @param {Number} crashFactor
  */
 async function setCasinoTradeOutcomes(client, gameHash, crashFactor) {
-  return await client.query(SET_CASINO_TRADE_OUTCOMES, [gameHash, crashFactor]);
+  return (await client).query(SET_CASINO_TRADE_OUTCOMES, [gameHash, crashFactor]);
 }
 
 /**
@@ -421,7 +421,7 @@ async function setCasinoTradeOutcomes(client, gameHash, crashFactor) {
  * @param {CASINO_TRADE_STATE} state
  */
 async function getCasinoTrades(client, gameHash, state) {
-  const res = await client.query(GET_CASINO_TRADES, [gameHash, state]);
+  const res = (await client).query(GET_CASINO_TRADES, [gameHash, state]);
   return res.rows;
 }
 
@@ -432,7 +432,7 @@ async function getCasinoTrades(client, gameHash, state) {
  * @param {CASINO_TRADE_STATE[]} states
  */
 async function getCasinoTradesByUserAndStates(userId, states) {
-  const res = await client.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
+  const res = (await client).query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
   return res.rows;
 }
 
@@ -462,7 +462,7 @@ async function insertAMMInteraction(
   outcomeTokensBought,
   trx_timestamp
 ) {
-  await client.query(INSERT_AMM_INTERACTION, [
+  (await client).query(INSERT_AMM_INTERACTION, [
     buyer,
     bet,
     outcome,
@@ -483,7 +483,7 @@ async function insertAMMInteraction(
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserChain(client, user) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER, [user]);
+  const res = (await client).query(GET_TRANSACTIONS_OF_USER, [user]);
   return res.rows;
 }
 
@@ -494,7 +494,7 @@ async function viewTransactionOfUserChain(client, user) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUser(user) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER, [user]);
+  const res = (await client).query(GET_TRANSACTIONS_OF_USER, [user]);
   return res.rows;
 }
 
@@ -508,7 +508,7 @@ async function viewTransactionOfUser(user) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbolChain(client, user, symbol) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
+  const res = (await client).query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
   return res.rows;
 }
 
@@ -520,7 +520,7 @@ async function viewTransactionOfUserBySymbolChain(client, user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbol(user, symbol) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
+  const res = (await client).query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
   return res.rows;
 }
 
@@ -533,7 +533,7 @@ async function viewTransactionOfUserBySymbol(user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewUserInvestment(user, bet, outcome) {
-  const res = await client.query(GET_USER_INVESTMENT, [user, bet, outcome]);
+  const res = (await client).query(GET_USER_INVESTMENT, [user, bet, outcome]);
   return res.rows;
 }
 
@@ -561,7 +561,7 @@ async function getBetInteractions(bet, startDate, direction) {
     values.push(direction);
   }
 
-  const res = await client.query(`${query};`, values);
+  const res = (await client).query(`${query};`, values);
   return res.rows;
 }
 
@@ -576,7 +576,7 @@ async function getBetInteractions(bet, startDate, direction) {
  * @returns {Promise<*>}
  */
 async function getBetInteractionsSummary(bet, direction, endDate) {
-  const res = await client.query(GET_BET_INTERACTIONS_SUMMARY, [bet, direction, endDate]);
+  const res = (await client).query(GET_BET_INTERACTIONS_SUMMARY, [bet, direction, endDate]);
   return res.rows;
 }
 
@@ -588,7 +588,7 @@ async function getBetInteractionsSummary(bet, direction, endDate) {
  * @returns {Promise<*>}
  */
 async function getBetInvestors(bet) {
-  const res = await client.query(GET_BET_INVESTORS, [bet]);
+  const res = (await client).query(GET_BET_INVESTORS, [bet]);
   return res.rows;
 }
 
@@ -601,7 +601,7 @@ async function getBetInvestors(bet) {
  * @returns {Promise<*>}
  */
 async function getBetInvestorsChain(client, bet) {
-  const res = await client.query(GET_BET_INVESTORS, [bet]);
+  const res = (await client).query(GET_BET_INVESTORS, [bet]);
   return res.rows;
 }
 
@@ -615,7 +615,7 @@ async function getBetInvestorsChain(client, bet) {
  * @returns {Promise<void>}
  */
 async function insertReport(bet_id, reporter, outcome, timestamp) {
-  await client.query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
+  (await client).query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
 }
 
 /**
@@ -630,7 +630,7 @@ async function insertReport(bet_id, reporter, outcome, timestamp) {
  * @returns {Promise<void>}
  */
 async function insertReportChain(client, bet_id, reporter, outcome, timestamp) {
-  await client.query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
+  (await client).query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
 }
 
 /**
@@ -640,7 +640,7 @@ async function insertReportChain(client, bet_id, reporter, outcome, timestamp) {
  * @returns {Promise<*>}
  */
 async function viewReport(bet_id) {
-  const res = await client.query(GET_REPORT, [bet_id]);
+  const res = (await client).query(GET_REPORT, [bet_id]);
   return res.rows;
 }
 
@@ -665,7 +665,7 @@ function getTimeParams(timePeriod, betId) {
 async function getAmmPriceActions(betId, timeOption) {
   const params = getTimeParams(timeOption, betId);
   const query = GET_AMM_PRICE_ACTIONS(params[0], params[1], params[2]);
-  const res = await client.query(query, params.slice(3));
+  const res = (await client).query(query, params.slice(3));
   return res.rows.map((r) => ({
     outcomeIndex: r.outcomeindex,
     trxTimestamp: r.trunc,
@@ -680,7 +680,7 @@ async function getAmmPriceActions(betId, timeOption) {
  * @returns {Promise<*>}
  */
 async function getLatestPriceActions(betId) {
-  const res = await client.query(GET_LATEST_PRICE_ACTIONS, [betId]);
+  const res = (await client).query(GET_LATEST_PRICE_ACTIONS, [betId]);
   return res.rows;
 }
 
@@ -692,10 +692,10 @@ async function getLatestPriceActions(betId) {
  */
 async function getUpcomingBets(gameId) {
   if(gameId){
-    const res = await client.query(GET_OPEN_TRADES_BY_GAME, [gameId])
+    const res = (await client).query(GET_OPEN_TRADES_BY_GAME, [gameId])
     return res.rows
   }
-  const res = await client.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
+  const res = (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
   return res.rows;
 }
 
@@ -706,7 +706,7 @@ async function getUpcomingBets(gameId) {
  *
  */
 async function getCurrentBets(gameHash) {
-  const res = await client.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
+  const res = (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
   return res.rows;
 }
 
@@ -717,7 +717,7 @@ async function getCurrentBets(gameHash) {
  *
  */
 async function getCashedOutBets(gameHash) {
-  const res = await client.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  const res = (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
 
@@ -728,7 +728,7 @@ async function getCashedOutBets(gameHash) {
  *
  */
 async function getLostBets(gameHash) {
-  const res = await client.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  const res = (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
 
@@ -740,7 +740,7 @@ async function getLostBets(gameHash) {
  *
  */
 async function setLostTrades(gameHash, crashFactor) {
-  const res = await client.query(SET_CASINO_LOST_TRADES_STATE, [gameHash, crashFactor])
+  const res = (await client).query(SET_CASINO_LOST_TRADES_STATE, [gameHash, crashFactor])
   return res.rows;
 }
 
@@ -753,7 +753,7 @@ async function setLostTrades(gameHash, crashFactor) {
  *
  */
 async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
-  const res = await client.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
+  const res = (await client).query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
   return res.rows;
 }
 
@@ -766,7 +766,7 @@ async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
  *
  */
 async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
-  const res = await client.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
+  const res = (await client).query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
   return res.rows;
 }
 
@@ -780,7 +780,7 @@ async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
  *
  */
 async function getMatches(page = 1, perPage = 10, gameId = process.env.GAME_ID) {
-  const res = await client.query(GET_CASINO_MATCHES, [gameId, perPage, page])
+  const res = (await client).query(GET_CASINO_MATCHES, [gameId, perPage, page])
   return res.rows;
 }
 
@@ -792,7 +792,7 @@ async function getMatches(page = 1, perPage = 10, gameId = process.env.GAME_ID) 
  *
  */
 async function getMatchById(matchId) {
-  const res = await client.query(GET_CASINO_MATCH_BY_ID, [matchId])
+  const res = (await client).query(GET_CASINO_MATCH_BY_ID, [matchId])
   return res.rows[0];
 }
 
@@ -804,7 +804,7 @@ async function getMatchById(matchId) {
  *
  */
 async function getMatchByGameHash(gameHash) {
-  const res = await client.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  const res = (await client).query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
   return res.rows;
 }
 
@@ -817,7 +817,7 @@ async function getMatchByGameHash(gameHash) {
  * @param gameId {String}
  */
 async function getNextMatchByGameHash(gameHash, gameId) {
-  const res = await client.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
+  const res = (await client).query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -829,7 +829,7 @@ async function getNextMatchByGameHash(gameHash, gameId) {
  * @param gameId {String}
  */
 async function getPrevMatchByGameHash(gameHash, gameId) {
-  const res = await client.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
+  const res = (await client).query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -841,7 +841,7 @@ async function getPrevMatchByGameHash(gameHash, gameId) {
  *
  */
 async function getMatchesForUpdateMissingValues() {
-  const res = await client.query(GET_CASINO_MATCHES_EXISTING_IN_TRADES, [])
+  const res = (await client).query(GET_CASINO_MATCHES_EXISTING_IN_TRADES, [])
   return res.rows;
 }
 
@@ -853,7 +853,7 @@ async function getMatchesForUpdateMissingValues() {
  *
  */
 async function updateMatchesMissingValues(gameHash) {
-  const res = await client.query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
+  const res = (await client).query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
   return res.rows;
 }
 
@@ -866,7 +866,7 @@ async function updateMatchesMissingValues(gameHash) {
  *
  */
 async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
-  const res = await client.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
+  const res = (await client).query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
   return res.rows;
 }
 
@@ -879,12 +879,12 @@ async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
  *
  */
 async function getAllTradesByGameHash(gameHash) {
-  const res = await client.query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
+  const res = (await client).query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
   return res.rows;
 }
 
 async function getOpenTrade(userId, gameId) {
-  const res = await client.query(GET_OPEN_TRADES_BY_USER_AND_GAME, [userId, gameId])
+  const res = (await client).query(GET_OPEN_TRADES_BY_USER_AND_GAME, [userId, gameId])
   if (res.rows.length) return res.rows[0];
   throw new Error('Trade not found')
 }
@@ -900,7 +900,7 @@ async function countTradesByLastXHours(lastHours = 24) {
   const useQuery = lastHours === 0 ? COUNT_CASINO_TRADES_BY_ALLTIME : COUNT_CASINO_TRADES_BY_LAST_X_HOURS;
   const useParams = lastHours === 0 ? [] : [lastHours];
 
-  const res = await client.query(useQuery, useParams);
+  const res = (await client).query(useQuery, useParams);
   return res.rows;
 }
 
