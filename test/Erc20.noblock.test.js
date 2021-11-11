@@ -74,7 +74,7 @@ describe("ERC 20", () => {
         .rejects.toBeInstanceOf(NoWeb3Exception);
 
       //Ensure the balance for the user hasn't been changed
-      expect(await WFAIR.balanceOf(failNoSymbolWallet)).toBe(0n);
+      expect(await noSymbol.balanceOf(failNoSymbolWallet)).toBe(0n);
 
     });
 
