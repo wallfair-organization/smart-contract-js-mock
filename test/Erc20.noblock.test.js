@@ -19,7 +19,7 @@ describe("ERC 20", () => {
         sender: '',
         receiver: testMintWallet,
         amount: tokensToMint,
-        symbol: 'WFAIR'
+        symbol: symbol
       };
       const WFAIR = new ERC20(symbol);
 
@@ -66,9 +66,12 @@ describe("ERC 20", () => {
 
     it("Fail to mint new tokens due to no symbol specified", async () => {
       const noSymbol = new ERC20(null);
-
-      await expect(noSymbol.mint("FailNoSymbolWallet", 1000n))
+      const failNoSymbolWallet = 'FailNoSymbolWallet'
+      await expect(noSymbol.mint(failNoSymbolWallet, 1000n))
         .rejects.toBeInstanceOf(NoWeb3Exception);
+
+      //Ensure the balance for the user hasn't been changed
+      expect(await WFAIR.balanceOf(failNoSymbolWallet)).toBe(0n);
 
     });
 
