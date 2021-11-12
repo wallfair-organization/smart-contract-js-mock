@@ -91,8 +91,12 @@ const GET_OPEN_TRADES_BY_USER_AND_GAME =
   `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND userId = $1 AND gameId = $2`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+const GET_HIGH_CASINO_TRADES_BY_PERIOD_ALL_GAMES =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY crashfactor DESC LIMIT $2`
+const GET_LUCKY_CASINO_TRADES_BY_PERIOD_ALL_GAMES =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
 const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
@@ -100,6 +104,8 @@ const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE =
   `SELECT * FROM casino_trades WHERE gameId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
 const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID =
   `SELECT * FROM casino_trades WHERE gameId = $1 AND userId = $2 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $3;`;
+const GET_LAST_COMPLETED_CASINO_TRADES_BY_USERID =
+  `SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
@@ -757,7 +763,9 @@ async function setLostTrades(gameHash, crashFactor) {
  *
  */
 async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
-  const res = await (await client).query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
+  const useQuery = gameId ? GET_HIGH_CASINO_TRADES_BY_PERIOD : GET_HIGH_CASINO_TRADES_BY_PERIOD_ALL_GAMES;
+  const useParams = gameId ? [interval, limit, gameId] : [interval, limit];
+  const res = await (await client).query(useQuery, useParams)
   return res.rows;
 }
 
@@ -770,7 +778,9 @@ async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
  *
  */
 async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
-  const res = await (await client).query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
+  const useQuery = gameId ? GET_LUCKY_CASINO_TRADES_BY_PERIOD : GET_LUCKY_CASINO_TRADES_BY_PERIOD_ALL_GAMES;
+  const useParams = gameId ? [interval, limit, gameId] : [interval, limit];
+  const res = await (await client).query(useQuery, useParams)
   return res.rows;
 }
 
@@ -909,16 +919,19 @@ async function countTradesByLastXHours(lastHours = 24) {
 }
 
 /**
- * get last X trades based on gameId or optional userId
+ * get last X trades based on optional gameId / userId
  * PostgreSQL
  *
  * @param gameId {String} - gameTypeId
+ * @param userId {String} - userId
  * @param limit {String}
  *
  */
 async function getLastCasinoTradesByGameType(gameId, userId, limit = 10) {
   let res = null;
-  if(userId) {
+  if(!gameId && userId) {
+    res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_USERID, [userId, limit]);
+  } else if(gameId && userId) {
     res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID, [gameId, userId, limit]);
   } else {
     res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE, [gameId, limit]);
