@@ -268,6 +268,18 @@ describe("CasinoTrade", () => {
       expect(result.currentBets).toHaveLength(0);
     });
 
+    it("Get existing bet without gameHash", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_cashedOutBetNoGameHash`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashedOutBetNoGameHash`, 2000n * WFAIR.ONE, 3, "cashedOutBetNoGameHash");
+
+      const result = await casino.getBets(null, "cashedOutBetNoGameHash");
+
+      //Ensure only 1 upcoming bet is retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(1);
+      expect(result.currentBets).toHaveLength(0);
+    });
   });
   describe("Reward winners", () => {
     it("Successfully reward one winner", async () => {
