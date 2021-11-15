@@ -7,6 +7,7 @@ describe("CasinoTrade", () => {
   const { setupDatabase, teardownDatabase, CASINO_TRADE_STATE } = require('../utils/db_helper');
   const ERC20 = require('../erc20_moc/Erc20.noblock');
   const Casino = require('../erc20_moc/CasinoTrade.noblock');
+  const bigDecimal = require('js-big-decimal');
 
   const WFAIR = new ERC20('WFAIR');
   const casinoWallet = 'CASINO';
@@ -267,6 +268,18 @@ describe("CasinoTrade", () => {
       expect(result.currentBets).toHaveLength(0);
     });
 
+    it("Get existing bet without gameHash", async () => {
+      await WFAIR.mint(`${BASE_WALLET}_cashedOutBetNoGameHash`, 5000n * WFAIR.ONE);
+
+      await casino.placeTrade(`${BASE_WALLET}_cashedOutBetNoGameHash`, 2000n * WFAIR.ONE, 3, "cashedOutBetNoGameHash");
+
+      const result = await casino.getBets(null, "cashedOutBetNoGameHash");
+
+      //Ensure only 1 upcoming bet is retrieved
+      expect(result.cashedOutBets).toHaveLength(0);
+      expect(result.upcomingBets).toHaveLength(1);
+      expect(result.currentBets).toHaveLength(0);
+    });
   });
   describe("Reward winners", () => {
     it("Successfully reward one winner", async () => {
@@ -357,5 +370,108 @@ describe("CasinoTrade", () => {
       expect(await casino.rewardWinners("rewardWinnersFail", null)).toHaveLength(0);
 
     });*/
+  });
+
+  describe('Place single game trade', () => {
+    it("Successfully win a single game trade", async () => {
+
+      const wallet = 'successfullyWinSingleTrade';
+
+      const tokensToMint = 10000n;
+      const betAmount = 1000n;
+      const multiplier = 10n;
+      const gameId = 'testSuccessfulSingleGameTrade';
+
+      const gameHash = 'testSuccessfulSingleGameTrade';
+      const riskFactor = 2;
+      await WFAIR.mint(wallet, tokensToMint);
+
+      await casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.LOCKED, gameHash, riskFactor);
+
+      //User should have a new balance of 19.000
+      expect(await WFAIR.balanceOf(wallet)).toBe(tokensToMint + (betAmount * multiplier) - betAmount);
+
+    });
+
+    it("Successfully win a single game trade with a non-integer multiplier", async () => {
+
+      const wallet = 'successfullyWinSingleTradeFloat';
+
+      const tokensToMint = 10000n;
+      const betAmount = 1000n;
+      const multiplier = 9.7;
+      const gameId = 'testSuccessfulFloatSingleGameTrade';
+
+      const gameHash = 'testSuccessfulFloatSingleGameTrade';
+      const riskFactor = 2;
+      await WFAIR.mint(wallet, tokensToMint);
+
+      await casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.LOCKED, gameHash, riskFactor);
+
+      //User should have a new balance of 18.700
+      expect(await WFAIR.balanceOf(wallet)).toBe(tokensToMint + BigInt(bigDecimal.round((bigDecimal.multiply(betAmount, multiplier)))) - betAmount);
+
+    });
+
+    it("Successfully tie a single game trade", async () => {
+
+      const wallet = 'successfullyTieSingleTrade';
+
+      const tokensToMint = 10000n;
+      const betAmount = 1000n;
+      const multiplier = 1n;
+      const gameId = 'testSuccessfulTieSingleGameTrade';
+
+      const gameHash = 'testSuccessfulTieSingleGameTrade';
+      const riskFactor = 2;
+      await WFAIR.mint(wallet, tokensToMint);
+
+      await casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.LOCKED, gameHash, riskFactor);
+
+      //User should have a new balance of 10.000
+      expect(await WFAIR.balanceOf(wallet)).toBe(tokensToMint + (betAmount * multiplier) - betAmount);
+
+    });
+
+    it("Successfully lose a single game trade with a non-integer multiplier", async () => {
+
+      const wallet = 'successfullyLoseSingleTrade';
+
+      const tokensToMint = 10000n;
+      const betAmount = 1000n;
+      const multiplier = 0.5;
+      const gameId = 'testSuccessfulFloatSingleGameTrade';
+
+      const gameHash = 'testSuccessfulFloatSingleGameTrade';
+      const riskFactor = 2;
+      await WFAIR.mint(wallet, tokensToMint);
+
+      await casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.LOCKED, gameHash, riskFactor);
+
+      //User should have a new balance of 9.500
+      expect(await WFAIR.balanceOf(wallet)).toBe(tokensToMint + BigInt(bigDecimal.round((bigDecimal.multiply(betAmount, multiplier)))) - betAmount);
+
+    });
+
+    it("Validate player hasnt got enough funds on single game trade with a non-integer multiplier", async () => {
+
+      const wallet = 'validateNoFundsSingleTrade';
+
+      const tokensToMint = 10000n;
+      const betAmount = 12000n;
+      const multiplier = 0.5;
+      const gameId = 'validateNoFundsSingleGameTrade';
+
+      const gameHash = 'validateNoFundsSingleGameTrade';
+      const riskFactor = 2;
+      await WFAIR.mint(wallet, tokensToMint);
+
+      await expect(casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.LOCKED, gameHash, riskFactor))
+        .rejects.toBeInstanceOf(NoWeb3Exception);
+
+      //User should have a new balance of 10.000
+      expect(await WFAIR.balanceOf(wallet)).toBe(tokensToMint);
+
+    });
   });
 });
