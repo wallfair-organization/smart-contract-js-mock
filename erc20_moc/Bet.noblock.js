@@ -1,10 +1,12 @@
 const ERC20 = require('./Erc20.noblock');
 const NoWeb3Exception = require('./Exception.noblock');
 const {
-  DIRECTION,
   createDBTransaction,
-  rollbackDBTransaction,
   commitDBTransaction,
+  rollbackDBTransaction
+} = require('@wallfair.io/wallfair-commons').utils;
+const {
+  DIRECTION,
   insertAMMInteraction,
   viewAllBalancesOfToken,
   getAllBalancesOfToken,

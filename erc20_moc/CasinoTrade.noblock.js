@@ -1,11 +1,12 @@
 const ERC20 = require('./Erc20.noblock');
 const bigDecimal = require('js-big-decimal');
-
+const {
+  createDBTransaction,
+  commitDBTransaction,
+  rollbackDBTransaction
+} = require('@wallfair.io/wallfair-commons').utils;
 const {
   CASINO_TRADE_STATE,
-  createDBTransaction,
-  rollbackDBTransaction,
-  commitDBTransaction,
   insertCasinoTrade,
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
@@ -29,7 +30,9 @@ const {
   getPrevMatchByGameHash,
   setLostTrades,
   getOpenTrade,
-  countTradesByLastXHours
+  countTradesByLastXHours,
+  insertCasinoSingleGameTrade,
+  getLastCasinoTradesByGameType
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -42,6 +45,7 @@ class CasinoTrade {
   }
 
   placeTrade = async (userWalletAddr, stakedAmount, crashFactor, gameId) => {
+    if(!gameId) throw new Error('Game id is required to place a trade');
     const dbClient = await createDBTransaction();
 
     try {
@@ -55,6 +59,49 @@ class CasinoTrade {
         stakedAmount,
       );
       await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId);
+
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+
+  /**
+   * For simple games, so we can insert all at once to casino_trades.
+   * Handle won / lost for single trades
+   */
+  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash, riskFactor) => {
+    const dbClient = await createDBTransaction();
+
+    try {
+      const parsedMultiplier = parseFloat(multiplier);
+      let reward = bigDecimal.multiply(BigInt(stakedAmount), parsedMultiplier);
+      const totalReward = BigInt(bigDecimal.round(reward));
+      const difference = totalReward - stakedAmount;
+
+      if(difference < 0) {
+        const amount = BigInt(bigDecimal.negate(difference));
+        // lock rest funds
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          userWalletAddr,
+          this.casinoWalletAddr,
+          amount
+        );
+      } else {
+        const amount = BigInt(difference);
+
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          this.casinoWalletAddr,
+          userWalletAddr,
+          amount
+        );
+      }
+
+      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash, riskFactor);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -132,7 +179,6 @@ class CasinoTrade {
 
         return { totalReward, stakedAmount };
       } else {
-        await rollbackDBTransaction(dbClient);
         throw `Total reward lower than 1: ${totalReward}`;
       }
     } catch (e) {
@@ -175,17 +221,17 @@ class CasinoTrade {
   getCasinoTradesByUserIdAndStates = async (userId, states) =>
     await getCasinoTradesByUserAndStates(userId, states);
 
-  getBets = async (gameHash) => {
+  getBets = async (gameHash, gameId) => {
     if(!gameHash){
-      const upcomingBets = await getUpcomingBets()
+      const upcomingBets = await getUpcomingBets(gameId)
       return {cashedOutBets: [], upcomingBets, currentBets: []}
     }
 
     const cashedOutBets = await getCashedOutBets(gameHash)
-    const upcomingBets = await getUpcomingBets()
+    const upcomingBets = await getUpcomingBets(gameId)
     const currentBets = await getCurrentBets(gameHash)
 
-    return {cashedOutBets, upcomingBets, currentBets}
+    return { cashedOutBets, upcomingBets, currentBets }
   }
 
   getLuckyWins = async (lastHours, limit, gameId) => await getLuckyBetsInInterval(lastHours, limit, gameId)
@@ -213,6 +259,8 @@ class CasinoTrade {
   getOpenTrade = async (userId, gameId) => getOpenTrade(userId, gameId)
 
   countTradesByLastXHours = async (lastHours) => countTradesByLastXHours(lastHours)
+
+  getLastCasinoTradesByGameType = async (gameId, userId, limit) => getLastCasinoTradesByGameType(gameId, userId, limit)
 }
 
 module.exports = CasinoTrade;

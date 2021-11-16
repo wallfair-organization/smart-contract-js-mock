@@ -1,21 +1,4 @@
-const { Pool } = require('pg');
-const fs = require('fs');
-
-const pool = new Pool({
-  user: process.env.POSTGRES_USER || 'postgres',
-  host: process.env.POSTGRES_HOST || 'localhost',
-  database: process.env.POSTGRES_DB || 'testdb',
-  password: process.env.POSTGRES_PASSWORD || 'postgres',
-  port: process.env.POSTGRES_PORT || 5432,
-  ssl:
-    process.env.POSTGRES_DISABLE_SSL === 'true'
-      ? false
-      : {
-        rejectUnauthorized: false,
-        ca: fs.readFileSync(process.env.POSTGRES_CA).toString(),
-      },
-});
-
+const client = require('@wallfair.io/wallfair-commons').utils.getPostgresConnection();
 const DIRECTION = {
   BUY: 'BUY',
   SELL: 'SELL',
@@ -31,15 +14,35 @@ const CASINO_TRADE_STATE = {
   CANCELED: 4
 };
 
-const BEGIN = 'BEGIN';
-const COMMIT = 'COMMIT';
-const ROLLBACK = 'ROLLBACK';
+const CREATE_TOKEN_TRANSACTIONS =
+  'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
+const CREATE_TOKEN_BALANCES =
+  'CREATE TABLE IF NOT EXISTS token_balances (owner varchar(255) not null, balance bigint not null, symbol varchar(255) not null, last_update timestamp not null, PRIMARY KEY(owner, symbol));';
+const CREATE_BET_REPORTS =
+  'CREATE TABLE IF NOT EXISTS bet_reports (bet_id varchar(255) not null PRIMARY KEY, reporter varchar(255) not null, outcome smallint not null, report_timestamp timestamp not null);';
+const CREATE_AMM_INTERACTIONS =
+  'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
+const CREATE_CASINO_MATCHES =
+  'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
+const CREATE_CASINO_TRADES =
+  'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, riskFactor decimal, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
 
-const GET_PLATFORM_USER_BALANCE = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3 LIMIT 1;`;
-const GET_BALANCE_OF_USER = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3;`;
-const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT balance FROM account WHERE symbol = $1 AND owner_account = $2 AND account_namespace = $3 FOR UPDATE;';
-const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM account WHERE owner = $1;';
-const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM account WHERE symbol = $1 AND balance > 0;';
+// ALTER TABLE token_transactions ALTER COLUMN amount TYPE BIGINT;
+// ALTER TABLE token_balances ALTER COLUMN balance TYPE BIGINT;
+
+const TEARDOWN_TOKEN_TRANSACTIONS = 'DROP TABLE token_transactions;';
+const TEARDOWN_TOKEN_BALANCES = 'DROP TABLE token_balances;';
+const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
+const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
+const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
+const TEARDOWN_CASINO_MATCHES = 'DROP TABLE casino_matches';
+
+const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
+const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2 FOR UPDATE;';
+const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
+const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
+const GET_LIMIT_BALANCE_OF_TOKEN =
+  'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY owner, balance DESC LIMIT $2;';
 
 const GET_TRANSACTIONS_OF_USER =
   'SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1);';
@@ -69,6 +72,8 @@ const INSERT_CASINO_MATCH =
   'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds) VALUES ($1, $2, $3, $4) RETURNING id;';
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
+const INSERT_CASINO_SINGLE_GAME_TRADE =
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor) VALUES ($1, $2, $3, $4, $5, $6, $7);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
@@ -86,10 +91,21 @@ const GET_OPEN_TRADES_BY_USER_AND_GAME =
   `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND userId = $1 AND gameId = $2`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
+const GET_HIGH_CASINO_TRADES_BY_PERIOD_ALL_GAMES =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY crashfactor DESC LIMIT $2`
+const GET_LUCKY_CASINO_TRADES_BY_PERIOD_ALL_GAMES =
+  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
+const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
+const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE =
+  `SELECT * FROM casino_trades WHERE gameId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
+const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID =
+  `SELECT * FROM casino_trades WHERE gameId = $1 AND userId = $2 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $3;`;
+const GET_LAST_COMPLETED_CASINO_TRADES_BY_USERID =
+  `SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
@@ -110,7 +126,7 @@ const UPDATE_CASINO_MATCHES_MISSING_VALUES =
        amountrewardedsum=amountrewardedsum_query.total,
        numtrades=numtrades_query.total,
        numcashouts=numcashouts_query.total
-   FROM
+     FROM
      (SELECT COALESCE(SUM(stakedamount),0) as total from casino_trades ct where ct.gamehash=$1) AS amountinvestedsum_query,
      (SELECT COALESCE(SUM(stakedamount),0) as total from casino_trades ct where ct.state=2 and ct.gamehash=$1) AS amountrewardedsum_query,
      (SELECT count(ct.id) as total from casino_trades ct where ct.gamehash=$1) AS numtrades_query,
@@ -124,60 +140,50 @@ const GET_ALL_TRADES_BY_GAME_HASH =
   'SELECT * FROM casino_trades WHERE gameHash = $1;';
 
 const SET_CASINO_LOST_TRADES_STATE =
-    `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
+  `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
 
 const COUNT_CASINO_TRADES_BY_LAST_X_HOURS =
-    `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) AND created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour';`
+  `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) AND created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour';`
 
 const COUNT_CASINO_TRADES_BY_ALLTIME =
-    `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]);`
+  `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]);`
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
-    outcomeindex, avg(quote) as quote
+         outcomeindex, avg(quote) as quote
   from amm_price_action
   where trx_timestamp > localtimestamp - interval '${interval2}' and betid = $3
   group by outcomeindex, trunc
   order by outcomeindex, trunc;`;
 const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
-    where trx_timestamp = (
-        select max(trx_timestamp)
-            from amm_price_action
-            where betid = $1
-    )`;
+                                  where trx_timestamp = (
+                                    select max(trx_timestamp)
+                                    from amm_price_action
+                                    where betid = $1
+                                  )`;
 
 /**
- * @returns {Promise<Client>}
- */
-async function getConnection() {
-  return await pool.connect();
-}
-
-/**
- * @returns {Promise<Client>}
- */
-async function createDBTransaction() {
-  const client = await getConnection();
-  await client.query(BEGIN);
-  return client;
-}
-
-/**
- * @param client {Client}
  * @returns {Promise<void>}
  */
-async function commitDBTransaction(client) {
-  await client.query(COMMIT);
-  client.release();
+async function setupDatabase() {
+  await (await client).query(CREATE_TOKEN_TRANSACTIONS);
+  await (await client).query(CREATE_TOKEN_BALANCES);
+  await (await client).query(CREATE_BET_REPORTS);
+  await (await client).query(CREATE_AMM_INTERACTIONS);
+  await (await client).query(CREATE_CASINO_MATCHES);
+  await (await client).query(CREATE_CASINO_TRADES);
 }
 
 /**
- * @param client {Client}
  * @returns {Promise<void>}
  */
-async function rollbackDBTransaction(client) {
-  await client.query(ROLLBACK);
-  client.release();
+async function teardownDatabase() {
+  await (await client).query(TEARDOWN_TOKEN_TRANSACTIONS);
+  await (await client).query(TEARDOWN_TOKEN_BALANCES);
+  await (await client).query(TEARDOWN_BET_REPORTS);
+  await (await client).query(TEARDOWN_AMM_INTERACTIONS);
+  await (await client).query(TEARDOWN_CASINO_TRADES);
+  await (await client).query(TEARDOWN_CASINO_MATCHES);
 }
 
 /**
@@ -227,7 +233,7 @@ async function viewBalanceOfUser(user, symbol, namespace) {
  * @returns {Promise<*>}
  */
 async function viewAMMInteractionsOfUser(user) {
-  const res = await pool.query(GET_ALL_AMM_INTERACTIONS_OF_USER, [user]);
+  const res = await (await client).query(GET_ALL_AMM_INTERACTIONS_OF_USER, [user]);
   return res.rows;
 }
 
@@ -240,7 +246,7 @@ async function viewAMMInteractionsOfUser(user) {
  * @returns {Promise<*>}
  */
 async function getAllBalancesOfUser(client, user) {
-  const res = await client.query(GET_ALL_BALANCE_OF_USER, [user]);
+  const res = await (await client).query(GET_ALL_BALANCE_OF_USER, [user]);
   return res.rows;
 }
 
@@ -251,7 +257,7 @@ async function getAllBalancesOfUser(client, user) {
  * @returns {Promise<*>}
  */
 async function viewAllBalancesOfUser(user) {
-  const res = await pool.query(GET_ALL_BALANCE_OF_USER, [user]);
+  const res = await (await client).query(GET_ALL_BALANCE_OF_USER, [user]);
   return res.rows;
 }
 
@@ -264,7 +270,7 @@ async function viewAllBalancesOfUser(user) {
  * @returns {Promise<*>}
  */
 async function getAllBalancesOfToken(client, symbol) {
-  const res = await client.query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
+  const res = await (await client).query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
   return res.rows;
 }
 
@@ -275,7 +281,19 @@ async function getAllBalancesOfToken(client, symbol) {
  * @returns {Promise<*>}
  */
 async function viewAllBalancesOfToken(symbol) {
-  const res = await pool.query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
+  const res = await (await client).query(GET_ALL_BALANCE_OF_TOKEN, [symbol]);
+  return res.rows;
+}
+
+/**
+ * View the balance of a specific token
+ *
+ * @param symbol {String}
+ * @param limit {number}
+ * @returns {Promise<*>}
+ */
+async function viewLimitBalancesOfToken(symbol, limit) {
+  const res = await (await client).query(GET_LIMIT_BALANCE_OF_TOKEN, [symbol, limit]);
   return res.rows;
 }
 
@@ -308,7 +326,7 @@ async function updateBalanceOfUser(client, user, symbol, amount, namespace) {
  * @returns {Promise<void>}
  */
 async function insertTransaction(client, sender, receiver, amount, symbol, timestamp) {
-  await client.query(INSERT_TOKEN_TRANSACTION, [sender, receiver, amount, symbol, timestamp]);
+  await (await client).query(INSERT_TOKEN_TRANSACTION, [sender, receiver, amount, symbol, timestamp]);
 }
 
 /**
@@ -322,12 +340,34 @@ async function insertTransaction(client, sender, receiver, amount, symbol, times
  * @param gameId {String}
  */
 async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId) {
-  await client.query(INSERT_CASINO_TRADE, [
+  await (await client).query(INSERT_CASINO_TRADE, [
     userWalletAddr,
     crashFactor,
     stakedAmount,
     CASINO_TRADE_STATE.OPEN,
     gameId
+  ]);
+}
+
+/**
+ * Saves a new Casino Trade at once for simple games
+ * Meant to be used inside a transaction together with a balance
+ *
+ * @param client {Client}
+ * @param userWalletAddr  {String}
+ * @param crashFactor {Number}
+ * @param stakedAmount {Number}
+ * @param gameId {String}
+ */
+async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor) {
+  await (await client).query(INSERT_CASINO_SINGLE_GAME_TRADE, [
+    userWalletAddr,
+    crashFactor,
+    stakedAmount,
+    state,
+    gameId,
+    gameHash,
+    riskFactor
   ]);
 }
 
@@ -339,7 +379,7 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
  * @param tradeId  {String}
  */
 async function cancelCasinoTrade(client, tradeId) {
-  return await client.query(CANCEL_CASINO_TRADE, [
+  return await (await client).query(CANCEL_CASINO_TRADE, [
     tradeId
   ]);
 }
@@ -353,7 +393,7 @@ async function cancelCasinoTrade(client, tradeId) {
  * @returns
  */
 async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
-  return await client.query(SET_CASINO_TRADE_STATE, [
+  return await (await client).query(SET_CASINO_TRADE_STATE, [
     CASINO_TRADE_STATE.WIN,
     crashFactor,
     gameHash,
@@ -367,9 +407,9 @@ async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
  *
  */
 async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS) {
-  let res = await client.query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
+  let res = await (await client).query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
   let matchId = res.rows[0].id;
-  await client.query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
+  await (await client).query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
 }
 
 /**
@@ -380,7 +420,7 @@ async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameL
  * @param {Number} crashFactor
  */
 async function setCasinoTradeOutcomes(client, gameHash, crashFactor) {
-  return await client.query(SET_CASINO_TRADE_OUTCOMES, [gameHash, crashFactor]);
+  return await (await client).query(SET_CASINO_TRADE_OUTCOMES, [gameHash, crashFactor]);
 }
 
 /**
@@ -391,7 +431,7 @@ async function setCasinoTradeOutcomes(client, gameHash, crashFactor) {
  * @param {CASINO_TRADE_STATE} state
  */
 async function getCasinoTrades(client, gameHash, state) {
-  const res = await client.query(GET_CASINO_TRADES, [gameHash, state]);
+  const res = await (await client).query(GET_CASINO_TRADES, [gameHash, state]);
   return res.rows;
 }
 
@@ -402,7 +442,7 @@ async function getCasinoTrades(client, gameHash, state) {
  * @param {CASINO_TRADE_STATE[]} states
  */
 async function getCasinoTradesByUserAndStates(userId, states) {
-  const res = await pool.query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
+  const res = await (await client).query(GET_CASINO_TRADES_BY_USER_AND_STATES, [userId, states]);
   return res.rows;
 }
 
@@ -432,7 +472,7 @@ async function insertAMMInteraction(
   outcomeTokensBought,
   trx_timestamp
 ) {
-  await client.query(INSERT_AMM_INTERACTION, [
+  await (await client).query(INSERT_AMM_INTERACTION, [
     buyer,
     bet,
     outcome,
@@ -453,7 +493,7 @@ async function insertAMMInteraction(
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserChain(client, user) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER, [user]);
+  const res = await (await client).query(GET_TRANSACTIONS_OF_USER, [user]);
   return res.rows;
 }
 
@@ -464,7 +504,7 @@ async function viewTransactionOfUserChain(client, user) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUser(user) {
-  const res = await pool.query(GET_TRANSACTIONS_OF_USER, [user]);
+  const res = await (await client).query(GET_TRANSACTIONS_OF_USER, [user]);
   return res.rows;
 }
 
@@ -478,7 +518,7 @@ async function viewTransactionOfUser(user) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbolChain(client, user, symbol) {
-  const res = await client.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
+  const res = await (await client).query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
   return res.rows;
 }
 
@@ -490,7 +530,7 @@ async function viewTransactionOfUserBySymbolChain(client, user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewTransactionOfUserBySymbol(user, symbol) {
-  const res = await pool.query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
+  const res = await (await client).query(GET_TRANSACTIONS_OF_USER_AND_TOKEN, [symbol, user]);
   return res.rows;
 }
 
@@ -503,7 +543,7 @@ async function viewTransactionOfUserBySymbol(user, symbol) {
  * @returns {Promise<*>}
  */
 async function viewUserInvestment(user, bet, outcome) {
-  const res = await pool.query(GET_USER_INVESTMENT, [user, bet, outcome]);
+  const res = await (await client).query(GET_USER_INVESTMENT, [user, bet, outcome]);
   return res.rows;
 }
 
@@ -531,7 +571,7 @@ async function getBetInteractions(bet, startDate, direction) {
     values.push(direction);
   }
 
-  const res = await pool.query(`${query};`, values);
+  const res = await (await client).query(`${query};`, values);
   return res.rows;
 }
 
@@ -546,7 +586,7 @@ async function getBetInteractions(bet, startDate, direction) {
  * @returns {Promise<*>}
  */
 async function getBetInteractionsSummary(bet, direction, endDate) {
-  const res = await pool.query(GET_BET_INTERACTIONS_SUMMARY, [bet, direction, endDate]);
+  const res = await (await client).query(GET_BET_INTERACTIONS_SUMMARY, [bet, direction, endDate]);
   return res.rows;
 }
 
@@ -558,7 +598,7 @@ async function getBetInteractionsSummary(bet, direction, endDate) {
  * @returns {Promise<*>}
  */
 async function getBetInvestors(bet) {
-  const res = await pool.query(GET_BET_INVESTORS, [bet]);
+  const res = await (await client).query(GET_BET_INVESTORS, [bet]);
   return res.rows;
 }
 
@@ -571,7 +611,7 @@ async function getBetInvestors(bet) {
  * @returns {Promise<*>}
  */
 async function getBetInvestorsChain(client, bet) {
-  const res = await client.query(GET_BET_INVESTORS, [bet]);
+  const res = await (await client).query(GET_BET_INVESTORS, [bet]);
   return res.rows;
 }
 
@@ -585,7 +625,7 @@ async function getBetInvestorsChain(client, bet) {
  * @returns {Promise<void>}
  */
 async function insertReport(bet_id, reporter, outcome, timestamp) {
-  await pool.query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
+  await (await client).query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
 }
 
 /**
@@ -600,7 +640,7 @@ async function insertReport(bet_id, reporter, outcome, timestamp) {
  * @returns {Promise<void>}
  */
 async function insertReportChain(client, bet_id, reporter, outcome, timestamp) {
-  await client.query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
+  await (await client).query(INSERT_REPORT, [bet_id, reporter, outcome, timestamp]);
 }
 
 /**
@@ -610,7 +650,7 @@ async function insertReportChain(client, bet_id, reporter, outcome, timestamp) {
  * @returns {Promise<*>}
  */
 async function viewReport(bet_id) {
-  const res = await pool.query(GET_REPORT, [bet_id]);
+  const res = await (await client).query(GET_REPORT, [bet_id]);
   return res.rows;
 }
 
@@ -635,7 +675,7 @@ function getTimeParams(timePeriod, betId) {
 async function getAmmPriceActions(betId, timeOption) {
   const params = getTimeParams(timeOption, betId);
   const query = GET_AMM_PRICE_ACTIONS(params[0], params[1], params[2]);
-  const res = await pool.query(query, params.slice(3));
+  const res = await (await client).query(query, params.slice(3));
   return res.rows.map((r) => ({
     outcomeIndex: r.outcomeindex,
     trxTimestamp: r.trunc,
@@ -650,15 +690,22 @@ async function getAmmPriceActions(betId, timeOption) {
  * @returns {Promise<*>}
  */
 async function getLatestPriceActions(betId) {
-  const res = await pool.query(GET_LATEST_PRICE_ACTIONS, [betId]);
+  const res = await (await client).query(GET_LATEST_PRICE_ACTIONS, [betId]);
   return res.rows;
 }
 
 /**
  * Get upcoming bets (open bets)
+ *
+ * @param gameId {String}
+ *
  */
-async function getUpcomingBets() {
-  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
+async function getUpcomingBets(gameId) {
+  if(gameId){
+    const res = await (await client).query(GET_OPEN_TRADES_BY_GAME, [gameId])
+    return res.rows
+  }
+  const res = await (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.OPEN), [CASINO_TRADE_STATE.OPEN])
   return res.rows;
 }
 
@@ -669,7 +716,7 @@ async function getUpcomingBets() {
  *
  */
 async function getCurrentBets(gameHash) {
-  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
+  const res = await (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOCKED, gameHash), [CASINO_TRADE_STATE.LOCKED, gameHash])
   return res.rows;
 }
 
@@ -680,7 +727,7 @@ async function getCurrentBets(gameHash) {
  *
  */
 async function getCashedOutBets(gameHash) {
-  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  const res = await (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.WIN, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
 
@@ -691,7 +738,7 @@ async function getCashedOutBets(gameHash) {
  *
  */
 async function getLostBets(gameHash) {
-  const res = await pool.query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
+  const res = await (await client).query(GET_CASINO_TRADES_BY_STATE(CASINO_TRADE_STATE.LOSS, gameHash), [CASINO_TRADE_STATE.WIN, gameHash])
   return res.rows;
 }
 
@@ -703,7 +750,7 @@ async function getLostBets(gameHash) {
  *
  */
 async function setLostTrades(gameHash, crashFactor) {
-  const res = await pool.query(SET_CASINO_LOST_TRADES_STATE, [gameHash, crashFactor])
+  const res = await (await client).query(SET_CASINO_LOST_TRADES_STATE, [gameHash, crashFactor])
   return res.rows;
 }
 
@@ -716,7 +763,9 @@ async function setLostTrades(gameHash, crashFactor) {
  *
  */
 async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
-  const res = await pool.query(GET_HIGH_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
+  const useQuery = gameId ? GET_HIGH_CASINO_TRADES_BY_PERIOD : GET_HIGH_CASINO_TRADES_BY_PERIOD_ALL_GAMES;
+  const useParams = gameId ? [interval, limit, gameId] : [interval, limit];
+  const res = await (await client).query(useQuery, useParams)
   return res.rows;
 }
 
@@ -729,7 +778,9 @@ async function getHighBetsInInterval(interval = 24, limit = 100, gameId) {
  *
  */
 async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
-  const res = await pool.query(GET_LUCKY_CASINO_TRADES_BY_PERIOD, [interval, limit, gameId])
+  const useQuery = gameId ? GET_LUCKY_CASINO_TRADES_BY_PERIOD : GET_LUCKY_CASINO_TRADES_BY_PERIOD_ALL_GAMES;
+  const useParams = gameId ? [interval, limit, gameId] : [interval, limit];
+  const res = await (await client).query(useQuery, useParams)
   return res.rows;
 }
 
@@ -743,7 +794,7 @@ async function getLuckyBetsInInterval(interval = 24, limit = 100, gameId) {
  *
  */
 async function getMatches(page = 1, perPage = 10, gameId = process.env.GAME_ID) {
-  const res = await pool.query(GET_CASINO_MATCHES, [gameId, perPage, page])
+  const res = await (await client).query(GET_CASINO_MATCHES, [gameId, perPage, page])
   return res.rows;
 }
 
@@ -755,7 +806,7 @@ async function getMatches(page = 1, perPage = 10, gameId = process.env.GAME_ID) 
  *
  */
 async function getMatchById(matchId) {
-  const res = await pool.query(GET_CASINO_MATCH_BY_ID, [matchId])
+  const res = await (await client).query(GET_CASINO_MATCH_BY_ID, [matchId])
   return res.rows[0];
 }
 
@@ -767,7 +818,7 @@ async function getMatchById(matchId) {
  *
  */
 async function getMatchByGameHash(gameHash) {
-  const res = await pool.query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+  const res = await (await client).query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
   return res.rows;
 }
 
@@ -780,7 +831,7 @@ async function getMatchByGameHash(gameHash) {
  * @param gameId {String}
  */
 async function getNextMatchByGameHash(gameHash, gameId) {
-  const res = await pool.query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
+  const res = await (await client).query(GET_NEXT_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -792,7 +843,7 @@ async function getNextMatchByGameHash(gameHash, gameId) {
  * @param gameId {String}
  */
 async function getPrevMatchByGameHash(gameHash, gameId) {
-  const res = await pool.query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
+  const res = await (await client).query(GET_PREV_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -804,7 +855,7 @@ async function getPrevMatchByGameHash(gameHash, gameId) {
  *
  */
 async function getMatchesForUpdateMissingValues() {
-  const res = await pool.query(GET_CASINO_MATCHES_EXISTING_IN_TRADES, [])
+  const res = await (await client).query(GET_CASINO_MATCHES_EXISTING_IN_TRADES, [])
   return res.rows;
 }
 
@@ -816,7 +867,7 @@ async function getMatchesForUpdateMissingValues() {
  *
  */
 async function updateMatchesMissingValues(gameHash) {
-  const res = await pool.query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
+  const res = await (await client).query(UPDATE_CASINO_MATCHES_MISSING_VALUES, [gameHash])
   return res.rows;
 }
 
@@ -829,7 +880,7 @@ async function updateMatchesMissingValues(gameHash) {
  *
  */
 async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
-  const res = await pool.query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
+  const res = await (await client).query(GET_USER_PLAYED_LAST_X_DAYS_IN_ROW, [userId, lastDays]);
   return res.rows;
 }
 
@@ -842,13 +893,13 @@ async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
  *
  */
 async function getAllTradesByGameHash(gameHash) {
-  const res = await pool.query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
+  const res = await (await client).query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
   return res.rows;
 }
 
-async function getOpenTrade(userId, gameId){
-  const res = await pool.query(GET_OPEN_TRADES_BY_USER_AND_GAME, [userId, gameId])
-  if(res.rows.length) return res.rows[0];
+async function getOpenTrade(userId, gameId) {
+  const res = await (await client).query(GET_OPEN_TRADES_BY_USER_AND_GAME, [userId, gameId])
+  if (res.rows.length) return res.rows[0];
   throw new Error('Trade not found')
 }
 
@@ -863,17 +914,36 @@ async function countTradesByLastXHours(lastHours = 24) {
   const useQuery = lastHours === 0 ? COUNT_CASINO_TRADES_BY_ALLTIME : COUNT_CASINO_TRADES_BY_LAST_X_HOURS;
   const useParams = lastHours === 0 ? [] : [lastHours];
 
-  const res = await pool.query(useQuery, useParams);
+  const res = await (await client).query(useQuery, useParams);
+  return res.rows;
+}
+
+/**
+ * get last X trades based on optional gameId / userId
+ * PostgreSQL
+ *
+ * @param gameId {String} - gameTypeId
+ * @param userId {String} - userId
+ * @param limit {String}
+ *
+ */
+async function getLastCasinoTradesByGameType(gameId, userId, limit = 10) {
+  let res = null;
+  if(!gameId && userId) {
+    res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_USERID, [userId, limit]);
+  } else if(gameId && userId) {
+    res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID, [gameId, userId, limit]);
+  } else {
+    res = await (await client).query(GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE, [gameId, limit]);
+  }
   return res.rows;
 }
 
 module.exports = {
-  pool,
   DIRECTION,
   CASINO_TRADE_STATE,
-  createDBTransaction,
-  commitDBTransaction,
-  rollbackDBTransaction,
+  setupDatabase,
+  teardownDatabase,
   getBalanceOfUser,
   getBalanceOfUserForUpdate,
   viewBalanceOfUser,
@@ -882,6 +952,7 @@ module.exports = {
   viewAllBalancesOfUser,
   getAllBalancesOfToken,
   viewAllBalancesOfToken,
+  viewLimitBalancesOfToken,
   updateBalanceOfUser,
   insertTransaction,
   insertAMMInteraction,
@@ -922,5 +993,7 @@ module.exports = {
   getPrevMatchByGameHash,
   setLostTrades,
   getOpenTrade,
-  countTradesByLastXHours
+  countTradesByLastXHours,
+  insertCasinoSingleGameTrade,
+  getLastCasinoTradesByGameType
 };

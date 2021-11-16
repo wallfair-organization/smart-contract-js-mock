@@ -1,7 +1,9 @@
 const {
   createDBTransaction,
   commitDBTransaction,
-  rollbackDBTransaction,
+  rollbackDBTransaction
+} = require('@wallfair.io/wallfair-commons').utils;
+const {
   getBalanceOfUser,
   getBalanceOfUserForUpdate,
   viewBalanceOfUser,
