@@ -1,20 +1,4 @@
-const { Pool } = require('pg');
-
-const pool = new Pool({
-  user: process.env.POSTGRES_USER || 'postgres',
-  host: process.env.POSTGRES_HOST || 'localhost',
-  database: process.env.POSTGRES_DB || 'testdb',
-  password: process.env.POSTGRES_PASSWORD || 'postgres',
-  port: process.env.POSTGRES_PORT || 5432,
-  ssl:
-    process.env.POSTGRES_DISABLE_SSL === 'true'
-      ? false
-      : {
-        rejectUnauthorized: false,
-        ca: fs.readFileSync(process.env.POSTGRES_CA).toString(),
-      },
-});
-
+const client = require('@wallfair.io/wallfair-commons').utils.getPostgresConnection();
 const CREATE_TOKEN_TRANSACTIONS =
   'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
 const CREATE_TOKEN_BALANCES =
@@ -60,39 +44,39 @@ const TEARDOWN_USER_ACCOUNT = 'DROP TABLE user_account';
  * @returns {Promise<void>}
  */
 async function setupDatabase() {
-  await pool.query(CREATE_TOKEN_TRANSACTIONS);
-  await pool.query(CREATE_TOKEN_BALANCES);
-  await pool.query(CREATE_BET_REPORTS);
-  await pool.query(CREATE_AMM_INTERACTIONS);
-  await pool.query(CREATE_CASINO_MATCHES);
-  await pool.query(CREATE_CASINO_TRADES);
-  await pool.query(CREATE_ACCOUNT_NAMESPACE_ENUM);
-  await pool.query(CREATE_ACCOUNTS);
-  await pool.query(CREATE_USER_ACCOUNT);
+  await (await client).query(CREATE_TOKEN_TRANSACTIONS);
+  await (await client).query(CREATE_TOKEN_BALANCES);
+  await (await client).query(CREATE_BET_REPORTS);
+  await (await client).query(CREATE_AMM_INTERACTIONS);
+  await (await client).query(CREATE_CASINO_MATCHES);
+  await (await client).query(CREATE_CASINO_TRADES);
+  await (await client).query(CREATE_ACCOUNT_NAMESPACE_ENUM);
+  await (await client).query(CREATE_ACCOUNTS);
+  await (await client).query(CREATE_USER_ACCOUNT);
 }
 
 async function createAccount(namespace, owner, symbol, balance) {
-  await pool.query(CREATE_ACCOUNT, [namespace, owner, symbol, balance]);
+  await (await client).query(CREATE_ACCOUNT, [namespace, owner, symbol, balance]);
 }
 
 /**
  * @returns {Promise<void>}
  */
 async function teardownDatabase() {
-  await pool.query(TEARDOWN_TOKEN_TRANSACTIONS);
-  await pool.query(TEARDOWN_TOKEN_BALANCES);
-  await pool.query(TEARDOWN_BET_REPORTS);
-  await pool.query(TEARDOWN_AMM_INTERACTIONS);
-  await pool.query(TEARDOWN_CASINO_TRADES);
-  await pool.query(TEARDOWN_CASINO_MATCHES);
-  await pool.query(TEARDOWN_ACCOUNT);
-  await pool.query(TEARDOWN_USER_ACCOUNT);
-  await pool.query(TEARDOWN_ACCOUNT_NAMESPACE_ENUM);
+  await (await client).query(TEARDOWN_TOKEN_TRANSACTIONS);
+  await (await client).query(TEARDOWN_TOKEN_BALANCES);
+  await (await client).query(TEARDOWN_BET_REPORTS);
+  await (await client).query(TEARDOWN_AMM_INTERACTIONS);
+  await (await client).query(TEARDOWN_CASINO_TRADES);
+  await (await client).query(TEARDOWN_CASINO_MATCHES);
+  await (await client).query(TEARDOWN_ACCOUNT);
+  await (await client).query(TEARDOWN_USER_ACCOUNT);
+  await (await client).query(TEARDOWN_ACCOUNT_NAMESPACE_ENUM);
 }
 
 async function resetBetState() {
-  await pool.query(DELETE_BET_REPORTS);
-  await pool.query(RESET_BALANCES);
+  await (await client).query(DELETE_BET_REPORTS);
+  await (await client).query(RESET_BALANCES);
 }
 
 module.exports = {

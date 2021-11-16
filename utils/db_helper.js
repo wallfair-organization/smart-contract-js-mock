@@ -26,7 +26,20 @@ const CREATE_CASINO_MATCHES =
   'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
 const CREATE_CASINO_TRADES =
   'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, riskFactor decimal, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
-
+const CREATE_ACCOUNT_NAMESPACE_ENUM = `CREATE TYPE account_namespace_enum AS ENUM('usr', 'eth', 'bet', 'tdl', 'cas')`;
+const CREATE_ACCOUNTS =
+  `CREATE TABLE IF NOT EXISTS "account" ("owner_account" character varying NOT NULL, "account_namespace" "public"."account_namespace_enum" NOT NULL, "symbol" character varying NOT NULL, "balance" numeric(18,0) NOT NULL, CONSTRAINT "PK_8ec3dedb1ee17a8630a7c57b0f9" PRIMARY KEY ("owner_account", "account_namespace", "symbol"));` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('usr', '615bf607f04fbb15aa5dd367', 'WFAIR', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('usr', '615bfb7df04fbb15aa5dd368', 'WFAIR', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('eth', 'liquidity_provider', 'WFAIR', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'testBetId', 'WFAIR', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'testBetId', '0_testBetId', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', 'testBetId', '1_testBetId', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', '615bf607f04fbb15aa5dd367', '0_testBetId', 0);` +
+  `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ('bet', '615bfb7df04fbb15aa5dd368', '0_testBetId', 0);`;
+const CREATE_USER_ACCOUNT =
+  `CREATE TABLE "user_account" ("user_id" character varying NOT NULL, "owner_account" character varying NOT NULL, "account_namespace" "public"."account_namespace_enum" NOT NULL, "symbol" character varying NOT NULL, CONSTRAINT "PK_1e7af5387f4169347ddef6e8180" PRIMARY KEY ("user_id"))`
+const CREATE_ACCOUNT = `INSERT INTO account(account_namespace, owner_account, symbol, balance) VALUES ($1, $2, $3, $4);`
 // ALTER TABLE token_transactions ALTER COLUMN amount TYPE BIGINT;
 // ALTER TABLE token_balances ALTER COLUMN balance TYPE BIGINT;
 
@@ -36,14 +49,15 @@ const TEARDOWN_BET_REPORTS = 'DROP TABLE bet_reports;';
 const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
 const TEARDOWN_CASINO_MATCHES = 'DROP TABLE casino_matches';
+const TEARDOWN_ACCOUNT_NAMESPACE_ENUM = 'DROP TYPE account_namespace_enum';
+const TEARDOWN_ACCOUNT = 'DROP TABLE account';
+const TEARDOWN_USER_ACCOUNT = 'DROP TABLE user_account';
 
 const GET_PLATFORM_USER_BALANCE = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3 LIMIT 1;`;
-const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
-const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2 FOR UPDATE;';
-const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
-const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM token_balances WHERE symbol = $1 AND balance > 0;';
-const GET_LIMIT_BALANCE_OF_TOKEN =
-  'SELECT * FROM token_balances WHERE symbol = $1 ORDER BY owner, balance DESC LIMIT $2;';
+const GET_BALANCE_OF_USER = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3;`;
+const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT balance FROM account WHERE symbol = $1 AND owner_account = $2 AND account_namespace = $3 FOR UPDATE;';
+const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM account WHERE owner = $1;';
+const GET_ALL_BALANCE_OF_TOKEN = 'SELECT * FROM account WHERE symbol = $1 AND balance > 0;';
 
 const GET_TRANSACTIONS_OF_USER =
   'SELECT * FROM token_transactions WHERE (sender = $1 OR receiver = $1);';
@@ -73,13 +87,12 @@ const INSERT_CASINO_MATCH =
   'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds) VALUES ($1, $2, $3, $4) RETURNING id;';
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
-const INSERT_CASINO_SINGLE_GAME_TRADE =
-  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor) VALUES ($1, $2, $3, $4, $5, $6, $7);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
 const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameHash = $1 AND state = $2;';
+const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND state = $4 AND userId = $5 RETURNING *;';
 const CANCEL_CASINO_TRADE =
@@ -92,21 +105,10 @@ const GET_OPEN_TRADES_BY_USER_AND_GAME =
   `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND userId = $1 AND gameId = $2`
 const GET_HIGH_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
-const GET_HIGH_CASINO_TRADES_BY_PERIOD_ALL_GAMES =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY (crashfactor * stakedamount) DESC LIMIT $2`
 const GET_LUCKY_CASINO_TRADES_BY_PERIOD =
   `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 AND gameId=$3 ORDER BY crashfactor DESC LIMIT $2`
-const GET_LUCKY_CASINO_TRADES_BY_PERIOD_ALL_GAMES =
-  `SELECT * FROM casino_trades WHERE created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour' AND state=2 ORDER BY crashfactor DESC LIMIT $2`
 const GET_CASINO_TRADES_BY_STATE = (p1, p2) =>
   `SELECT * FROM casino_trades WHERE state = $1 AND gamehash ${p2 ? '= $2' : 'IS NULL'}`;
-const GET_OPEN_TRADES_BY_GAME = `SELECT * FROM casino_trades WHERE state= ${CASINO_TRADE_STATE.OPEN} AND gamehash IS NULL AND gameId = $1`;
-const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE =
-  `SELECT * FROM casino_trades WHERE gameId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
-const GET_LAST_COMPLETED_CASINO_TRADES_BY_GAMETYPE_USERID =
-  `SELECT * FROM casino_trades WHERE gameId = $1 AND userId = $2 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $3;`;
-const GET_LAST_COMPLETED_CASINO_TRADES_BY_USERID =
-  `SELECT * FROM casino_trades WHERE userId = $1 AND state = ANY('{${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) ORDER BY created_at DESC LIMIT $2;`;
 const GET_CASINO_MATCHES =
   'SELECT * FROM casino_matches WHERE gameid = $1 ORDER BY created_at DESC LIMIT $2 OFFSET ($2*$3)';
 const GET_CASINO_MATCH_BY_ID =
@@ -151,7 +153,7 @@ const COUNT_CASINO_TRADES_BY_ALLTIME =
 
 const GET_AMM_PRICE_ACTIONS = (interval1, interval2, timePart) => `
   select date_trunc($1, trx_timestamp) + (interval '${interval1}' * (extract('${timePart}' from trx_timestamp)::int / $2)) as trunc,
-         outcomeindex, avg(quote) as quote
+    outcomeindex, avg(quote) as quote
   from amm_price_action
   where trx_timestamp > localtimestamp - interval '${interval2}' and betid = $3
   group by outcomeindex, trunc
@@ -173,6 +175,9 @@ async function setupDatabase() {
   await (await client).query(CREATE_AMM_INTERACTIONS);
   await (await client).query(CREATE_CASINO_MATCHES);
   await (await client).query(CREATE_CASINO_TRADES);
+  await (await client).query(CREATE_ACCOUNT_NAMESPACE_ENUM);
+  await (await client).query(CREATE_ACCOUNTS);
+  await (await client).query(CREATE_USER_ACCOUNT);
 }
 
 /**
@@ -185,6 +190,9 @@ async function teardownDatabase() {
   await (await client).query(TEARDOWN_AMM_INTERACTIONS);
   await (await client).query(TEARDOWN_CASINO_TRADES);
   await (await client).query(TEARDOWN_CASINO_MATCHES);
+  await (await client).query(TEARDOWN_ACCOUNT);
+  await (await client).query(TEARDOWN_USER_ACCOUNT);
+  await (await client).query(TEARDOWN_ACCOUNT_NAMESPACE_ENUM);
 }
 
 /**
@@ -940,6 +948,10 @@ async function getLastCasinoTradesByGameType(gameId, userId, limit = 10) {
   return res.rows;
 }
 
+async function createAccount(namespace, owner, symbol, balance) {
+  await (await client).query(CREATE_ACCOUNT, [namespace, owner, symbol, balance]);
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -996,5 +1008,6 @@ module.exports = {
   getOpenTrade,
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
-  getLastCasinoTradesByGameType
+  getLastCasinoTradesByGameType,
+  createAccount,
 };
