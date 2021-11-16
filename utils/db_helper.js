@@ -37,6 +37,7 @@ const TEARDOWN_AMM_INTERACTIONS = 'DROP TABLE amm_interactions;';
 const TEARDOWN_CASINO_TRADES = 'DROP TABLE casino_trades;';
 const TEARDOWN_CASINO_MATCHES = 'DROP TABLE casino_matches';
 
+const GET_PLATFORM_USER_BALANCE = `SELECT balance FROM account WHERE owner_account = $1 AND symbol = $2 AND account_namespace = $3 LIMIT 1;`;
 const GET_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2;';
 const GET_BALANCE_OF_USER_FOR_UPDATE = 'SELECT * FROM token_balances WHERE symbol = $1 AND owner = $2 FOR UPDATE;';
 const GET_ALL_BALANCE_OF_USER = 'SELECT * FROM token_balances WHERE owner = $1;';
