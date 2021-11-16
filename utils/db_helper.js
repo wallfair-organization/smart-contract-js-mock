@@ -196,7 +196,7 @@ async function teardownDatabase() {
  * @returns {Promise<*>}
  */
 async function getBalanceOfUser(client, user, symbol, namespace) {
-  const res = await client.query(GET_BALANCE_OF_USER, [user, symbol, namespace]);
+  const res = await (await client).query(GET_BALANCE_OF_USER, [user, symbol, namespace]);
   return res.rows;
 }
 
@@ -210,7 +210,7 @@ async function getBalanceOfUser(client, user, symbol, namespace) {
  * @returns {Promise<*>}
  */
 async function getBalanceOfUserForUpdate(client, user, symbol, namespace) {
-  const res = await client.query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user, namespace]);
+  const res = await (await client).query(GET_BALANCE_OF_USER_FOR_UPDATE, [symbol, user, namespace]);
   return res.rows;
 }
 
@@ -222,7 +222,7 @@ async function getBalanceOfUserForUpdate(client, user, symbol, namespace) {
  * @returns {Promise<*>}
  */
 async function viewBalanceOfUser(user, symbol, namespace) {
-  const res = await pool.query(GET_PLATFORM_USER_BALANCE, [user, symbol, namespace]);
+  const res = await (await client).query(GET_PLATFORM_USER_BALANCE, [user, symbol, namespace]);
   return res.rows;
 }
 
@@ -309,7 +309,7 @@ async function viewLimitBalancesOfToken(symbol, limit) {
  * @returns {Promise<void>}
  */
 async function updateBalanceOfUser(client, user, symbol, amount, namespace) {
-  const res = await client.query(UPDATE_BALANCE_OF_USER, [user, symbol, amount, namespace]);
+  const res = await (await client).query(UPDATE_BALANCE_OF_USER, [user, symbol, amount, namespace]);
   return res.rows;
 }
 
