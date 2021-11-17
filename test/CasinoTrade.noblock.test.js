@@ -385,8 +385,7 @@ describe("CasinoTrade", () => {
       const gameHash = 'testSuccessfulSingleGameTrade';
       const riskFactor = 2;
       await WFAIR.mint(wallet, tokensToMint);
-
-      await casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.LOCKED, gameHash, riskFactor);
+      await casino.placeSingleGameTrade(wallet, betAmount, multiplier, gameId, CASINO_TRADE_STATE.WIN, gameHash, riskFactor);
 
       //User should have a new balance of 19.000
       expect(await WFAIR.balanceOf(wallet)).toBe(tokensToMint + (betAmount * multiplier) - betAmount);
