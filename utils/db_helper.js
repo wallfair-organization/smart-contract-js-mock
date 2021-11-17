@@ -23,7 +23,7 @@ const CREATE_BET_REPORTS =
 const CREATE_AMM_INTERACTIONS =
   'CREATE TABLE IF NOT EXISTS amm_interactions (ID SERIAL PRIMARY KEY, buyer varchar(255) NOT NULL, bet varchar(255) NOT NULL, outcome smallint NOT NULL, direction varchar(10) NOT NULL, investmentAmount bigint NOT NULL, feeAmount bigint NOT NULL, outcomeTokensBought bigint NOT NULL, trx_timestamp timestamp NOT NULL);';
 const CREATE_CASINO_MATCHES =
-  'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
+  'CREATE TABLE IF NOT EXISTS casino_matches (ID SERIAL PRIMARY KEY, gameId varchar(255) NOT NULL, gameHash varchar(255), currentHashLine INT, crashFactor decimal NOT NULL, gameLengthInSeconds INT, amountInvestedSum bigint, amountRewardedSum bigint, numTrades INT, numcashouts INT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)';
 const CREATE_CASINO_TRADES =
   'CREATE TABLE IF NOT EXISTS casino_trades (ID SERIAL PRIMARY KEY, userId varchar(255) NOT NULL, crashFactor decimal NOT NULL, stakedAmount bigint NOT NULL, state smallint NOT NULL, gameHash varchar(255), gameId varchar(255), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, riskFactor decimal, game_match int, CONSTRAINT fk_game_match FOREIGN KEY (game_match) REFERENCES casino_matches(ID));';
 
@@ -69,7 +69,7 @@ const INSERT_REPORT =
 const GET_REPORT = 'SELECT * FROM bet_reports WHERE bet_id = $1;';
 
 const INSERT_CASINO_MATCH =
-  'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds) VALUES ($1, $2, $3, $4) RETURNING id;';
+  'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds, currentHashLine) VALUES ($1, $2, $3, $4, $5) RETURNING id;';
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
@@ -117,6 +117,8 @@ const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND gameId = $2 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
 const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id AND gameId = $2 ORDER BY ID DESC limit 1;`
+const GET_LAST_CASINO_MATCH_BY_GAME_TYPE =
+  `SELECT * FROM casino_matches WHERE gameId = $1 ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
   `SELECT * FROM casino_matches cm WHERE amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL ORDER BY created_at DESC LIMIT 50`;
@@ -404,10 +406,11 @@ async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
 
 /**
  * Locks all open trades into specific gameHash
+ * extend with currentHashLine
  *
  */
-async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS) {
-  let res = await (await client).query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
+async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS, currentHashLine) {
+  let res = await (await client).query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS, currentHashLine]);
   let matchId = res.rows[0].id;
   await (await client).query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
 }
@@ -939,6 +942,15 @@ async function getLastCasinoTradesByGameType(gameId, userId, limit = 10) {
   return res.rows;
 }
 
+
+/**
+ * getLastMatchByGameType by gameId
+ */
+async function getLastMatchByGameType(gameId) {
+  const res = await (await client).query(GET_LAST_CASINO_MATCH_BY_GAME_TYPE, [gameId]);
+  return res.rows;
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -995,5 +1007,6 @@ module.exports = {
   getOpenTrade,
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
-  getLastCasinoTradesByGameType
+  getLastCasinoTradesByGameType,
+  getLastMatchByGameType
 };

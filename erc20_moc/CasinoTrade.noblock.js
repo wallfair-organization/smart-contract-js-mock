@@ -32,7 +32,8 @@ const {
   getOpenTrade,
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
-  getLastCasinoTradesByGameType
+  getLastCasinoTradesByGameType,
+  getLastMatchByGameType
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -127,11 +128,11 @@ class CasinoTrade {
     }
   };
 
-  lockOpenTrades = async (gameId, gameHash, crashFactor, gameLengthMS) => {
+  lockOpenTrades = async (gameId, gameHash, crashFactor, gameLengthMS, currentHashLine) => {
     const dbClient = await createDBTransaction();
 
     try {
-      await lockOpenCasinoTrades(dbClient, gameId, gameHash, crashFactor, gameLengthMS);
+      await lockOpenCasinoTrades(dbClient, gameId, gameHash, crashFactor, gameLengthMS, currentHashLine);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -255,6 +256,7 @@ class CasinoTrade {
   countTradesByLastXHours = async (lastHours) => countTradesByLastXHours(lastHours)
 
   getLastCasinoTradesByGameType = async (gameId, userId, limit) => getLastCasinoTradesByGameType(gameId, userId, limit)
+  getLastMatchByGameType = async (gameId) => getLastMatchByGameType(gameId)
 }
 
 module.exports = CasinoTrade;
