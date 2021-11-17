@@ -69,7 +69,7 @@ const INSERT_REPORT =
 const GET_REPORT = 'SELECT * FROM bet_reports WHERE bet_id = $1;';
 
 const INSERT_CASINO_MATCH =
-  'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds) VALUES ($1, $2, $3, $4) RETURNING id;';
+  'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds, currentHashLine) VALUES ($1, $2, $3, $4, $5) RETURNING id;';
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
@@ -117,6 +117,8 @@ const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND gameId = $2 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
 const GET_PREV_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) > cm.id AND gameId = $2 ORDER BY ID DESC limit 1;`
+const GET_LAST_CASINO_MATCH_BY_GAME_TYPE =
+  `SELECT * FROM casino_matches WHERE gameId = $1 ORDER BY ID DESC limit 1;`
 
 const GET_CASINO_MATCHES_EXISTING_IN_TRADES =
   `SELECT * FROM casino_matches cm WHERE amountinvestedsum IS NULL OR amountrewardedsum IS NULL OR numtrades IS NULL OR numcashouts IS NULL ORDER BY created_at DESC LIMIT 50`;
@@ -404,10 +406,11 @@ async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
 
 /**
  * Locks all open trades into specific gameHash
+ * extend with currentHashLine
  *
  */
-async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS) {
-  let res = await (await client).query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS]);
+async function lockOpenCasinoTrades(client, gameId, gameHash, crashFactor, gameLengthMS, currentHashLine) {
+  let res = await (await client).query(INSERT_CASINO_MATCH, [gameId, gameHash, crashFactor, gameLengthMS, currentHashLine]);
   let matchId = res.rows[0].id;
   await (await client).query(LOCK_OPEN_CASINO_TRADES, [CASINO_TRADE_STATE.LOCKED, gameHash, matchId, gameId]);
 }
@@ -939,6 +942,15 @@ async function getLastCasinoTradesByGameType(gameId, userId, limit = 10) {
   return res.rows;
 }
 
+
+/**
+ * getLastMatchByGameType by gameId
+ */
+async function getLastMatchByGameType(gameId) {
+  const res = await (await client).query(GET_LAST_CASINO_MATCH_BY_GAME_TYPE, [gameId]);
+  return res.rows;
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -995,5 +1007,6 @@ module.exports = {
   getOpenTrade,
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
-  getLastCasinoTradesByGameType
+  getLastCasinoTradesByGameType,
+  getLastMatchByGameType
 };
