@@ -54,7 +54,9 @@ class CasinoTrade {
         dbClient,
         userWalletAddr,
         this.casinoWalletAddr,
-        stakedAmount
+        'usr',
+        'cas',
+        stakedAmount,
       );
       await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId);
 
@@ -116,6 +118,8 @@ class CasinoTrade {
         dbClient,
         this.casinoWalletAddr,
         userWalletAddr,
+        'cas',
+        'usr',
         parseInt(openTrade.stakedamount)
       );
       await cancelCasinoTrade(dbClient, openTrade.id);
@@ -167,6 +171,8 @@ class CasinoTrade {
           dbClient,
           this.casinoWalletAddr,
           userWalletAddr,
+          'cas',
+          'usr',
           totalReward
         );
         await commitDBTransaction(dbClient);
@@ -200,7 +206,7 @@ class CasinoTrade {
         reward = BigInt(bigDecimal.round(reward));
         winner.reward = reward;
 
-        await this.WFAIRToken.transferChain(dbClient, this.casinoWalletAddr, winner.userid, reward);
+        await this.WFAIRToken.transferChain(dbClient, this.casinoWalletAddr, winner.userid, 'cas', 'usr', reward);
       }
 
       await commitDBTransaction(dbClient);
