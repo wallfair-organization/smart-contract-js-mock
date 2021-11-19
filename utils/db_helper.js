@@ -963,6 +963,7 @@ async function getLastMatchByGameType(gameId) {
 /**
  * Insert new mines match
  * *
+ * @param dbClient {Client}
  * @param gameId {String}
  * @param userId {String}
  * @param stakedAmount {Number}
@@ -970,14 +971,17 @@ async function getLastMatchByGameType(gameId) {
  * @param gamePayload {String} - JSON string
  *
  */
-async function createMinesMatch(userId,
+async function createMinesMatch(
+  dbClient,
+  userId,
                                 stakedAmount,
                                 gameId,
                                 gameHash,
                                 gamePayload){
   try {
-    const match = await (await client).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
-    const trade = await (await client).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id])
+    const match = await (await dbClient).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
+    const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id])
+
     return {match, trade}
   } catch (e) {
     console.error('Error creating mines match',

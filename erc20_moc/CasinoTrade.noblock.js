@@ -260,8 +260,23 @@ class CasinoTrade {
   getLastMatchByGameType = async (gameId) => getLastMatchByGameType(gameId)
 
   createMinesMatch = async (gameId, userId, stakedAmount, gameHash, gamePayload) => {
-    return await createMinesMatch(userId, stakedAmount, gameId, gameHash, JSON.stringify(gamePayload));
+    const dbClient = await createDBTransaction();
+    try{
+      await this.WFAIRToken.transferChain(
+        dbClient,
+        userId,
+        this.casinoWalletAddr,
+        stakedAmount
+      );
+      await createMinesMatch(dbClient, userId, stakedAmount, gameId, gameHash, JSON.stringify(gamePayload));
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
   }
+
+
 
 }
 
