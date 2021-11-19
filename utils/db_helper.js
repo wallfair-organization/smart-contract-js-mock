@@ -14,6 +14,11 @@ const CASINO_TRADE_STATE = {
   CANCELED: 4
 };
 
+const MINES_GAME_STATE = {
+  STARTED: 0,
+  FINISHED: 1,
+}
+
 const CREATE_TOKEN_TRANSACTIONS =
   'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
 const CREATE_TOKEN_BALANCES =
@@ -163,6 +168,10 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
                                     from amm_price_action
                                     where betid = $1
                                   )`;
+
+const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1);'
+const INSERT_MINES_TRADE =
+  `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1);`;
 
 /**
  * @returns {Promise<void>}
@@ -951,6 +960,34 @@ async function getLastMatchByGameType(gameId) {
   return res.rows;
 }
 
+/**
+ * Insert new mines match
+ * *
+ * @param gameId {String}
+ * @param userId {String}
+ * @param stakedAmount {Number}
+ * @param gameHash {String}
+ * @param gamePayload {String} - JSON string
+ *
+ */
+async function createMinesMatch(userId,
+                                stakedAmount,
+                                gameId,
+                                gameHash,
+                                gamePayload){
+  try {
+    const match = await (await client).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
+    const trade = await (await client).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id])
+    return {match, trade}
+  } catch (e) {
+    console.error('Error creating mines match',
+      `userId: ${userId}, stakedAmount: ${stakedAmount}, gameId: ${gameId}, gameHash: ${gameHash}`)
+    console.error(e);
+    throw e;
+  }
+
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -1008,5 +1045,6 @@ module.exports = {
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
   getLastCasinoTradesByGameType,
-  getLastMatchByGameType
+  getLastMatchByGameType,
+  createMinesMatch
 };

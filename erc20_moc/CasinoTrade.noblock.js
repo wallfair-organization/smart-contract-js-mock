@@ -33,7 +33,8 @@ const {
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
   getLastCasinoTradesByGameType,
-  getLastMatchByGameType
+  getLastMatchByGameType,
+  createMinesMatch
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -257,6 +258,11 @@ class CasinoTrade {
 
   getLastCasinoTradesByGameType = async (gameId, userId, limit) => getLastCasinoTradesByGameType(gameId, userId, limit)
   getLastMatchByGameType = async (gameId) => getLastMatchByGameType(gameId)
+
+  createMinesMatch = async (gameId, userId, stakedAmount, gameHash, gamePayload) => {
+    return await createMinesMatch(userId, stakedAmount, gameId, gameHash, JSON.stringify(gamePayload));
+  }
+
 }
 
 module.exports = CasinoTrade;
