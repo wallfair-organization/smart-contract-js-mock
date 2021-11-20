@@ -169,10 +169,10 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
                                     where betid = $1
                                   )`;
 
-const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1);'
+const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1) RETURNING *;'
 const INSERT_MINES_TRADE =
   `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1);`;
-const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE game_payload ->> userId = $1 AND game_payload ->> gameState = ${MINES_GAME_STATE.STARTED}`
+const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE cast(game_payload ->> 'userId' as varchar) = $1 AND cast(game_payload ->> 'gameState' as int) in (${MINES_GAME_STATE.STARTED});`
 const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS} WHERE game_match = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $2 RETURNING *;`
 const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
 const UPDATE_MINES_MATCH = 'UPDATE casino_matches SET game_payload = $1 WHERE game_match = $2 AND userId = $3 returning *';
@@ -984,6 +984,9 @@ async function createMinesMatch(
                                 gamePayload){
   try {
     const match = await (await dbClient).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
+
+    console.log('###match', match);
+
     const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id])
 
     return {match, trade}
@@ -1002,7 +1005,13 @@ async function createMinesMatch(
  *
  */
 async function getUsersMinesMatch(userId){
+
+  console.log('getUsersMinesMatch userId', userId);
+
   const result = await (await client).query(SELECT_MINES_MATCH_BY_USER_ID, [userId])
+
+  console.log('###result', result);
+
   if(!result.rows.length) return null
   return result.rows[0]
 }
