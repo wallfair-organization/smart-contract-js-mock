@@ -34,7 +34,9 @@ const {
   insertCasinoSingleGameTrade,
   getLastCasinoTradesByGameType,
   getLastMatchByGameType,
-  createMinesMatch
+  createMinesMatch,
+  getUsersMinesMatch,
+  updateUsersMinesMatch
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -274,6 +276,20 @@ class CasinoTrade {
       await rollbackDBTransaction(dbClient);
       throw e;
     }
+  }
+
+  getUsersMinesMatch = async (userId) => {
+    if(!userId) throw 'No userId provided';
+    const res = await getUsersMinesMatch(userId);
+    if(!res) return null;
+    return res;
+  }
+
+  updateUsersMinesMatch = async (userId, gamePayload, isLost) => {
+    if(!userId) throw 'No userId provided';
+    const res = await getUsersMinesMatch(userId);
+    if(!res) throw 'Match not found'
+    return await updateUsersMinesMatch(res.id, gamePayload, isLost)
   }
 
 

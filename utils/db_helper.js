@@ -172,6 +172,10 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
 const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1);'
 const INSERT_MINES_TRADE =
   `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1);`;
+const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE game_payload ->> userId = $1 AND game_payload ->> gameState = ${MINES_GAME_STATE.STARTED}`
+const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS} WHERE game_match = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $2 RETURNING *;`
+const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
+const UPDATE_MINES_MATCH = 'UPDATE casino_matches SET game_payload = $1 WHERE game_match = $2 AND userId = $3 returning *';
 
 /**
  * @returns {Promise<void>}
@@ -989,7 +993,40 @@ async function createMinesMatch(
     console.error(e);
     throw e;
   }
+}
 
+/**
+ * Get current user's match
+ * *
+ * @param userId {String}
+ *
+ */
+async function getUsersMinesMatch(userId){
+  const result = await (await client).query(SELECT_MINES_MATCH_BY_USER_ID, [userId])
+  if(!result.rows.length) return null
+  return result.rows[0]
+}
+
+/**
+ * Update user's mine match
+ * *
+ * @typedef {Object} GamePayload
+ * @property minesCount {Number}
+ * @property board {Number[]}
+ * @property clientBoard {Number[]}
+ * @property stakedAmount {Number}
+ * @property gameState {0|1}
+ * @property userId {String}
+ *
+ * @param matchId {Number}
+ * @param gamePayload {GamePayload}
+ * @param isLost {boolean}[false]
+ */
+async function updateUsersMinesMatch(matchId, gamePayload, isLost = false){
+  await (await client).query(UPDATE_MINES_MATCH, [gamePayload, matchId, gamePayload.userId])
+  if(isLost){
+    await (await client).query(SET_MINES_TRADE_LOST, [matchId, gamePayload.userId])
+  }
 }
 
 module.exports = {
@@ -1050,5 +1087,7 @@ module.exports = {
   insertCasinoSingleGameTrade,
   getLastCasinoTradesByGameType,
   getLastMatchByGameType,
-  createMinesMatch
+  createMinesMatch,
+  getUsersMinesMatch,
+  updateUsersMinesMatch
 };
