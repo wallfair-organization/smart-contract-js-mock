@@ -175,7 +175,7 @@ const INSERT_MINES_TRADE =
 const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE cast(game_payload ->> 'userId' as varchar) = $1 AND cast(game_payload ->> 'gameState' as int) in (${MINES_GAME_STATE.STARTED});`
 const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS} WHERE game_match = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $2 RETURNING *;`
 const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
-const UPDATE_MINES_MATCH = 'UPDATE casino_matches SET game_payload = $1 WHERE game_match = $2 AND userId = $3 returning *';
+const UPDATE_MINES_MATCH = `UPDATE casino_matches SET game_payload = $1 WHERE gameId = $2 AND cast(game_payload ->> 'userId' as varchar) = $3 returning *`;
 
 /**
  * @returns {Promise<void>}
@@ -985,8 +985,6 @@ async function createMinesMatch(
   try {
     const match = await (await dbClient).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
 
-    console.log('###match', match);
-
     const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id])
 
     return {match, trade}
@@ -1005,12 +1003,7 @@ async function createMinesMatch(
  *
  */
 async function getUsersMinesMatch(userId){
-
-  console.log('getUsersMinesMatch userId', userId);
-
   const result = await (await client).query(SELECT_MINES_MATCH_BY_USER_ID, [userId])
-
-  console.log('###result', result);
 
   if(!result.rows.length) return null
   return result.rows[0]
