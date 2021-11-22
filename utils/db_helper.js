@@ -14,6 +14,11 @@ const CASINO_TRADE_STATE = {
   CANCELED: 4
 };
 
+const MINES_GAME_STATE = {
+  STARTED: 0,
+  FINISHED: 1,
+}
+
 const CREATE_TOKEN_TRANSACTIONS =
   'CREATE TABLE IF NOT EXISTS token_transactions (ID SERIAL PRIMARY KEY, sender varchar(255) not null, receiver varchar(255) not null, amount bigint not null, symbol varchar(255) not null, trx_timestamp timestamp not null);';
 const CREATE_TOKEN_BALANCES =
@@ -163,6 +168,14 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
                                     from amm_price_action
                                     where betid = $1
                                   )`;
+
+const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1) RETURNING *;'
+const INSERT_MINES_TRADE =
+  `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor, gameHash) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1, $5);`;
+  const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE cast(game_payload ->> 'userId' as varchar) = $1 AND cast(game_payload ->> 'gameState' as int) in (${MINES_GAME_STATE.STARTED}) ORDER BY created_at DESC;`
+const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = 0 WHERE game_match = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $2 RETURNING *;`
+const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
+const UPDATE_MINES_MATCH = `UPDATE casino_matches SET game_payload = $1 WHERE id = $2 AND cast(game_payload ->> 'userId' as varchar) = $3 returning *`;
 
 /**
  * @returns {Promise<void>}
@@ -951,6 +964,74 @@ async function getLastMatchByGameType(gameId) {
   return res.rows;
 }
 
+/**
+ * Insert new mines match
+ * *
+ * @param dbClient {Client}
+ * @param gameId {String}
+ * @param userId {String}
+ * @param stakedAmount {Number}
+ * @param gameHash {String}
+ * @param gamePayload {String} - JSON string
+ *
+ */
+async function createMinesMatch(
+  dbClient,
+  userId,
+                                stakedAmount,
+                                gameId,
+                                gameHash,
+                                gamePayload){
+  try {
+    const match = await (await dbClient).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
+
+    const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id, gameHash])
+
+    return {match, trade}
+  } catch (e) {
+    console.error('Error creating mines match',
+      `userId: ${userId}, stakedAmount: ${stakedAmount}, gameId: ${gameId}, gameHash: ${gameHash}`)
+    console.error(e);
+    throw e;
+  }
+}
+
+/**
+ * Get current user's match
+ * *
+ * @param userId {String}
+ *
+ */
+async function getUsersMinesMatch(userId){
+  const result = await (await client).query(SELECT_MINES_MATCH_BY_USER_ID, [userId])
+
+  if(!result.rows.length) return null
+  return result.rows[0]
+}
+
+/**
+ * Update user's mine match
+ * *
+ * @typedef {Object} GamePayload
+ * @property minesCount {Number}
+ * @property board {Number[]}
+ * @property clientBoard {Number[]}
+ * @property stakedAmount {Number}
+ * @property gameState {0|1}
+ * @property userId {String}
+ *
+ * @param matchId {Number}
+ * @param gamePayload {GamePayload}
+ * @param isLost {boolean}[false]
+ */
+async function updateUsersMinesMatch(matchId, gamePayload, isLost = false){
+  await (await client).query(UPDATE_MINES_MATCH, [gamePayload, matchId, gamePayload.userId])
+  if(isLost){
+    const res = await (await client).query(SET_MINES_TRADE_LOST, [matchId, gamePayload.userId])
+    return res.rows;
+  }
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -1008,5 +1089,8 @@ module.exports = {
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
   getLastCasinoTradesByGameType,
-  getLastMatchByGameType
+  getLastMatchByGameType,
+  createMinesMatch,
+  getUsersMinesMatch,
+  updateUsersMinesMatch
 };

@@ -33,7 +33,10 @@ const {
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
   getLastCasinoTradesByGameType,
-  getLastMatchByGameType
+  getLastMatchByGameType,
+  createMinesMatch,
+  getUsersMinesMatch,
+  updateUsersMinesMatch
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -257,6 +260,40 @@ class CasinoTrade {
 
   getLastCasinoTradesByGameType = async (gameId, userId, limit) => getLastCasinoTradesByGameType(gameId, userId, limit)
   getLastMatchByGameType = async (gameId) => getLastMatchByGameType(gameId)
+
+  createMinesMatch = async (gameId, userId, stakedAmount, gameHash, gamePayload) => {
+    const dbClient = await createDBTransaction();
+    try{
+      await this.WFAIRToken.transferChain(
+        dbClient,
+        userId,
+        this.casinoWalletAddr,
+        stakedAmount
+      );
+      await createMinesMatch(dbClient, userId, stakedAmount, gameId, gameHash, JSON.stringify(gamePayload));
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  }
+
+  getUsersMinesMatch = async (userId) => {
+    if(!userId) throw 'No userId provided';
+    const res = await getUsersMinesMatch(userId);
+    if(!res) return null;
+    return res;
+  }
+
+  updateUsersMinesMatch = async (userId, gamePayload, isLost) => {
+    if(!userId) throw 'No userId provided';
+    const res = await getUsersMinesMatch(userId);
+    if(!res) throw 'Match not found'
+    return await updateUsersMinesMatch(res.id, gamePayload, isLost)
+  }
+
+
+
 }
 
 module.exports = CasinoTrade;
