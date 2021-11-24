@@ -240,14 +240,14 @@ class CasinoTrade {
 
   getMatch = async (matchId) => getMatchById(matchId)
 
-  getMatchByHash = async (gameHash) => getMatchByGameHash(gameHash)
+  getMatchByHash = async (gameHash, gameId) => getMatchByGameHash(gameHash, gameId)
   getMatchesForUpdateMissingValues = async () => getMatchesForUpdateMissingValues()
 
   updateMatchesMissingValues = async (gameHash) => updateMatchesMissingValues(gameHash)
 
   getUserPlayedLastXDaysInRow = async (userId, lastDays) => getUserPlayedLastXDaysInRow(userId, lastDays)
 
-  getAllTradesByGameHash = async (gameHash) => getAllTradesByGameHash(gameHash)
+  getAllTradesByGameHash = async (gameHash, gameId) => getAllTradesByGameHash(gameHash, gameId)
 
   getNextMatchByGameHash = async (gameHash, gameId) => getNextMatchByGameHash(gameHash, gameId)
   getPrevMatchByGameHash = async (gameHash, gameId) => getPrevMatchByGameHash(gameHash, gameId)
