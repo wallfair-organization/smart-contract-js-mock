@@ -116,7 +116,7 @@ const GET_CASINO_MATCHES =
 const GET_CASINO_MATCH_BY_ID =
   'SELECT * FROM casino_matches WHERE id = $1'
 const GET_CASINO_MATCH_BY_GAME_HASH =
-  'SELECT * FROM casino_matches WHERE gamehash = $1 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
+  'SELECT * FROM casino_matches WHERE gamehash = $1 AND gameid = $2 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL;'
 
 const GET_NEXT_CASINO_MATCH_BY_GAME_HASH =
   `SELECT * FROM casino_matches cm WHERE (SELECT id FROM casino_matches WHERE gamehash = $1) < cm.id AND gameId = $2 AND amountinvestedsum IS NOT NULL AND amountrewardedsum IS NOT NULL AND numtrades IS NOT NULL AND numcashouts IS NOT NULL ORDER BY ID asc limit 1;`
@@ -144,7 +144,7 @@ const GET_USER_PLAYED_LAST_X_DAYS_IN_ROW =
   `SELECT date_trunc('day', ct.created_at) "day", count(1) AS total_played FROM casino_trades ct WHERE ct.userid = $1 and ct.created_at >= CURRENT_TIMESTAMP - $2 * INTERVAL '1 day' GROUP BY 1 ORDER BY 1;`
 
 const GET_ALL_TRADES_BY_GAME_HASH =
-  'SELECT * FROM casino_trades WHERE gameHash = $1;';
+  'SELECT * FROM casino_trades WHERE gameHash = $1 AND gameId = $2;';
 
 const SET_CASINO_LOST_TRADES_STATE =
   `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
@@ -827,14 +827,15 @@ async function getMatchById(matchId) {
 }
 
 /**
- * For game details, get match by game hash, dont allow to get current match to avoid crash factor leak
+ * For game details, get match by game hash and gameId, dont allow to get current match to avoid crash factor leak
  * PostgreSQL interval
  *
  * @param gameHash {String}
+ * @param gameId {String}
  *
  */
-async function getMatchByGameHash(gameHash) {
-  const res = await (await client).query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash])
+async function getMatchByGameHash(gameHash, gameId) {
+  const res = await (await client).query(GET_CASINO_MATCH_BY_GAME_HASH, [gameHash, gameId])
   return res.rows;
 }
 
@@ -901,15 +902,15 @@ async function getUserPlayedLastXDaysInRow(userId, lastDays = 6) {
 }
 
 /**
- * get trades by gameHash and sort them by staked amount
+ * get trades by gameHash and gameId
  * PostgreSQL
  *
  * @param userId {String}
- * @param lastDays {Number}
+ * @param gameId {String}
  *
  */
-async function getAllTradesByGameHash(gameHash) {
-  const res = await (await client).query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash]);
+async function getAllTradesByGameHash(gameHash, gameId) {
+  const res = await (await client).query(GET_ALL_TRADES_BY_GAME_HASH, [gameHash, gameId]);
   return res.rows;
 }
 
