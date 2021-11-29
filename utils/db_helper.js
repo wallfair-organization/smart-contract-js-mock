@@ -179,13 +179,13 @@ const UPDATE_MINES_MATCH = `UPDATE casino_matches SET game_payload = $1 WHERE id
 
 //casino_fairness table
 const GET_CASINO_FAIR_RECORD =
-  'SELECT * FROM casino_fairness WHERE userId = $1 AND gameid = $2;'
+  'SELECT * FROM casino_fairness WHERE userId = $1 AND gameid = $2 ORDER BY created_at DESC LIMIT 1;'
 const INSERT_CASINO_FAIR_RECORD =
   'INSERT INTO casino_fairness (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) VALUES ($1, $2, $3, $4, $5, $6);'
 const UPDATE_CASINO_FAIR_RECORD =
-  'UPDATE casino_fairness SET serverSeed = $3, clientSeed = $4, nonce = $5, currentHashLine = $6, updated_at = now() WHERE userId = $1 AND gameid = $2'
+  'UPDATE casino_fairness SET serverSeed = $2, clientSeed = $3, nonce = $4, currentHashLine = $5, updated_at = now() WHERE id = $1'
 const UPDATE_CASINO_FAIR_NONCE =
-  'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE userId = $1 AND gameid = $2'
+  'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE id = $1'
 
 /**
  * @returns {Promise<void>}
@@ -1050,7 +1050,6 @@ async function updateUsersMinesMatch(matchId, gamePayload, isLost = false){
  * @param gameId {String}
  */
 async function getFairRecord(userId, gameId) {
-  console.log('getFairRecord', {userId, gameId});
   const res = await (await client).query(GET_CASINO_FAIR_RECORD, [userId, gameId])
   return res.rows;
 }
@@ -1074,15 +1073,14 @@ async function createFairRecord(userId, gameId, serverSeed, clientSeed, nonce, c
 /**
  * update fair record
  *
- * @param userId {String}
- * @param gameId {String}
+ * @param id {String}
  * @param serverSeed {String}
  * @param clientSeed {String}
  * @param nonce {Number}
  * @param currentHashLine {Number}
  */
-async function updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) {
-  const res = await (await client).query(UPDATE_CASINO_FAIR_RECORD, [userId, gameId, serverSeed, clientSeed, nonce, currentHashLine])
+async function updateFairRecord(id, serverSeed, clientSeed, nonce, currentHashLine) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_RECORD, [id, serverSeed, clientSeed, nonce, currentHashLine])
   return res.rows;
 }
 
@@ -1092,8 +1090,8 @@ async function updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, c
  * @param userId {String}
  * @param gameId {String}
  */
-async function incrementFairNonce(userId, gameId) {
-  const res = await (await client).query(UPDATE_CASINO_FAIR_NONCE, [userId, gameId])
+async function incrementFairNonce(id) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_NONCE, [id])
   return res.rows;
 }
 
