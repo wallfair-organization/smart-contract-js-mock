@@ -144,7 +144,7 @@ class CasinoTrade {
     }
   };
 
-  cashout = async (userWalletAddr, crashFactor, gameHash) => {
+  cashout = async (userWalletAddr, crashFactor, gameHash, cashoutLimit) => {
     const dbClient = await createDBTransaction();
 
     try {
@@ -156,12 +156,16 @@ class CasinoTrade {
 
       let totalReward = 0n;
       let stakedAmount = 0n;
+      let limit = BigInt(bigDecimal.round(cashoutLimit))
 
       for (let row of res.rows) {
         let { stakedamount } = row;
         let reward = bigDecimal.multiply(BigInt(stakedamount), parseFloat(crashFactor));
         reward = BigInt(bigDecimal.round(reward));
         totalReward += reward;
+        if(totalReward > limit){
+          totalReward = limit
+        }
 
         stakedAmount += BigInt(stakedamount);
       }
