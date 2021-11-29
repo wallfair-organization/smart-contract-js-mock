@@ -78,7 +78,7 @@ class CasinoTrade {
    * For simple games, so we can insert all at once to casino_trades.
    * Handle won / lost for single trades
    */
-  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash, riskFactor) => {
+  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash, riskFactor, fairnessId) => {
     const dbClient = await createDBTransaction();
 
     try {
@@ -107,7 +107,7 @@ class CasinoTrade {
         );
       }
 
-      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash, riskFactor);
+      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash, riskFactor, fairnessId);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -297,7 +297,7 @@ class CasinoTrade {
   }
 
   getFairRecord = async (userId, gameId) => getFairRecord(userId, gameId)
-  createFairRecord = async (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) => createFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine)
+  createFairRecord = async (userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) => createFairRecord(userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine)
   updateFairRecord = async (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) => updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine)
   incrementFairNonce = async (userId, gameId) => incrementFairNonce(userId, gameId)
 }

@@ -78,7 +78,7 @@ const INSERT_CASINO_MATCH =
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
-  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor) VALUES ($1, $2, $3, $4, $5, $6, $7);';
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor, fairnessId) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
@@ -181,9 +181,9 @@ const UPDATE_MINES_MATCH = `UPDATE casino_matches SET game_payload = $1 WHERE id
 const GET_CASINO_FAIR_RECORD =
   'SELECT * FROM casino_fairness WHERE userId = $1 AND gameid = $2 ORDER BY created_at DESC LIMIT 1;'
 const INSERT_CASINO_FAIR_RECORD =
-  'INSERT INTO casino_fairness (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) VALUES ($1, $2, $3, $4, $5, $6);'
+  'INSERT INTO casino_fairness (userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) VALUES ($1, $2, $3, $4, $5, $6, $7);'
 const UPDATE_CASINO_FAIR_RECORD =
-  'UPDATE casino_fairness SET serverSeed = $2, clientSeed = $3, nonce = $4, currentHashLine = $5, updated_at = now() WHERE id = $1'
+  'UPDATE casino_fairness SET serverSeed = $2, nextServerSeed = $3, clientSeed = $4, nonce = $5, currentHashLine = $6, updated_at = now() WHERE id = $1'
 const UPDATE_CASINO_FAIR_NONCE =
   'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE id = $1'
 
@@ -384,7 +384,7 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
  * @param stakedAmount {Number}
  * @param gameId {String}
  */
-async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor) {
+async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor, fairnessId = null) {
   await (await client).query(INSERT_CASINO_SINGLE_GAME_TRADE, [
     userWalletAddr,
     crashFactor,
@@ -392,7 +392,8 @@ async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, 
     state,
     gameId,
     gameHash,
-    riskFactor
+    riskFactor,
+    fairnessId
   ]);
 }
 
@@ -1064,9 +1065,8 @@ async function getFairRecord(userId, gameId) {
  * @param nonce {Number}
  * @param currentHashLine {Number}
  */
-async function createFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) {
-  console.log('getFairRecord', {userId, gameId});
-  const res = await (await client).query(INSERT_CASINO_FAIR_RECORD, [userId, gameId, serverSeed, clientSeed, nonce, currentHashLine])
+async function createFairRecord(userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) {
+  const res = await (await client).query(INSERT_CASINO_FAIR_RECORD, [userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine])
   return res.rows;
 }
 
@@ -1079,8 +1079,8 @@ async function createFairRecord(userId, gameId, serverSeed, clientSeed, nonce, c
  * @param nonce {Number}
  * @param currentHashLine {Number}
  */
-async function updateFairRecord(id, serverSeed, clientSeed, nonce, currentHashLine) {
-  const res = await (await client).query(UPDATE_CASINO_FAIR_RECORD, [id, serverSeed, clientSeed, nonce, currentHashLine])
+async function updateFairRecord(id, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_RECORD, [id, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine])
   return res.rows;
 }
 
