@@ -36,7 +36,11 @@ const {
   getLastMatchByGameType,
   createMinesMatch,
   getUsersMinesMatch,
-  updateUsersMinesMatch
+  updateUsersMinesMatch,
+  getFairRecord,
+  createFairRecord,
+  updateFairRecord,
+  incrementFairNonce
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -292,8 +296,10 @@ class CasinoTrade {
     return await updateUsersMinesMatch(res.id, gamePayload, isLost)
   }
 
-
-
+  getFairRecord = async (userId, gameId) => getFairRecord(userId, gameId)
+  createFairRecord = async (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) => createFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine)
+  updateFairRecord = async (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) => updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine)
+  incrementFairNonce = async (userId, gameId) => incrementFairNonce(userId, gameId)
 }
 
 module.exports = CasinoTrade;

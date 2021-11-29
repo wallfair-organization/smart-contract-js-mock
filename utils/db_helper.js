@@ -177,6 +177,16 @@ const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_ST
 const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
 const UPDATE_MINES_MATCH = `UPDATE casino_matches SET game_payload = $1 WHERE id = $2 AND cast(game_payload ->> 'userId' as varchar) = $3 returning *`;
 
+//casino_fairness table
+const GET_CASINO_FAIR_RECORD =
+  'SELECT * FROM casino_fairness WHERE userId = $1 AND gameid = $2;'
+const INSERT_CASINO_FAIR_RECORD =
+  'INSERT INTO casino_fairness (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) VALUES ($1, $2, $3, $4, $5, $6);'
+const UPDATE_CASINO_FAIR_RECORD =
+  'UPDATE casino_fairness SET serverSeed = $3, clientSeed = $4, nonce = $5, currentHashLine = $6, updated_at = now() WHERE userId = $1 AND gameid = $2'
+const UPDATE_CASINO_FAIR_NONCE =
+  'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE userId = $1 AND gameid = $2'
+
 /**
  * @returns {Promise<void>}
  */
@@ -1033,6 +1043,60 @@ async function updateUsersMinesMatch(matchId, gamePayload, isLost = false){
   }
 }
 
+/**
+ * get record from casino_fairness
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ */
+async function getFairRecord(userId, gameId) {
+  console.log('getFairRecord', {userId, gameId});
+  const res = await (await client).query(GET_CASINO_FAIR_RECORD, [userId, gameId])
+  return res.rows;
+}
+
+/**
+ * create fair record
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ * @param serverSeed {String}
+ * @param clientSeed {String}
+ * @param nonce {Number}
+ * @param currentHashLine {Number}
+ */
+async function createFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) {
+  console.log('getFairRecord', {userId, gameId});
+  const res = await (await client).query(INSERT_CASINO_FAIR_RECORD, [userId, gameId, serverSeed, clientSeed, nonce, currentHashLine])
+  return res.rows;
+}
+
+/**
+ * update fair record
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ * @param serverSeed {String}
+ * @param clientSeed {String}
+ * @param nonce {Number}
+ * @param currentHashLine {Number}
+ */
+async function updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_RECORD, [userId, gameId, serverSeed, clientSeed, nonce, currentHashLine])
+  return res.rows;
+}
+
+/**
+ * increment bet number = nonce (zero based) starting from 0
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ */
+async function incrementFairNonce(userId, gameId) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_NONCE, [userId, gameId])
+  return res.rows;
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -1093,5 +1157,9 @@ module.exports = {
   getLastMatchByGameType,
   createMinesMatch,
   getUsersMinesMatch,
-  updateUsersMinesMatch
+  updateUsersMinesMatch,
+  getFairRecord,
+  createFairRecord,
+  updateFairRecord,
+  incrementFairNonce
 };
