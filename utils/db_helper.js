@@ -188,7 +188,10 @@ const UPDATE_CASINO_FAIR_NONCE =
   'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE id = $1'
 const GET_CASINO_TRADE_WITH_FAIRNESS =
     'SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE ct.gamehash = $1 AND ct.gameid = $2;'
-
+const GET_NEXT_CASINO_TRADE_WITH_FAIRNESS =
+    `SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE (SELECT id FROM casino_trades WHERE gamehash = $1 AND gameId = $2) < ct.id AND ct.gameId = $2 ORDER BY ct.ID ASC limit 1;`
+const GET_PREV_CASINO_TRADE_WITH_FAIRNESS =
+    `SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE (SELECT id FROM casino_trades WHERE gamehash = $1 AND gameId = $2) > ct.id AND ct.gameId = $2 ORDER BY ct.ID DESC limit 1;`
 
 /**
  * @returns {Promise<void>}
@@ -1111,6 +1114,30 @@ async function getTradeWithFairness(gameHash, gameId) {
   return res.rows;
 }
 
+/**
+ * get next match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ * @param gameId {String}
+ */
+async function getNextTradeWithFairness(gameHash, gameId) {
+  const res = await (await client).query(GET_NEXT_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
+  return res.rows;
+}
+
+/**
+ * get prev match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ * @param gameId {String}
+ */
+async function getPrevTradeWithFairness(gameHash, gameId) {
+  const res = await (await client).query(GET_PREV_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
+  return res.rows;
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -1176,5 +1203,7 @@ module.exports = {
   createFairRecord,
   updateFairRecord,
   incrementFairNonce,
-  getTradeWithFairness
+  getTradeWithFairness,
+  getNextTradeWithFairness,
+  getPrevTradeWithFairness
 };

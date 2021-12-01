@@ -41,7 +41,9 @@ const {
   createFairRecord,
   updateFairRecord,
   incrementFairNonce,
-  getTradeWithFairness
+  getTradeWithFairness,
+  getNextTradeWithFairness,
+  getPrevTradeWithFairness
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -302,6 +304,8 @@ class CasinoTrade {
   updateFairRecord = async (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) => updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine)
   incrementFairNonce = async (userId, gameId) => incrementFairNonce(userId, gameId)
   getTradeWithFairness = async (gameHash, gameId) => getTradeWithFairness(gameHash, gameId)
+  getNextTradeWithFairness = async (gameHash, gameId) => getNextTradeWithFairness(gameHash, gameId)
+  getPrevTradeWithFairness = async (gameHash, gameId) => getPrevTradeWithFairness(gameHash, gameId)
 }
 
 module.exports = CasinoTrade;
