@@ -78,7 +78,7 @@ const INSERT_CASINO_MATCH =
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
-  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor, fairnessId) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);';
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor, fairnessId, fairnessNonce) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
@@ -186,6 +186,9 @@ const UPDATE_CASINO_FAIR_RECORD =
   'UPDATE casino_fairness SET serverSeed = $2, nextServerSeed = $3, clientSeed = $4, nonce = $5, currentHashLine = $6, updated_at = now() WHERE id = $1'
 const UPDATE_CASINO_FAIR_NONCE =
   'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE id = $1'
+const GET_CASINO_TRADE_WITH_FAIRNESS =
+    'SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE ct.gamehash = $1 AND ct.gameid = $2;'
+
 
 /**
  * @returns {Promise<void>}
@@ -384,7 +387,7 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
  * @param stakedAmount {Number}
  * @param gameId {String}
  */
-async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor, fairnessId = null) {
+async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor, fairnessId = null, fairnessNonce = null) {
   await (await client).query(INSERT_CASINO_SINGLE_GAME_TRADE, [
     userWalletAddr,
     crashFactor,
@@ -393,7 +396,8 @@ async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, 
     gameId,
     gameHash,
     riskFactor,
-    fairnessId
+    fairnessId,
+    fairnessNonce
   ]);
 }
 
@@ -1095,6 +1099,18 @@ async function incrementFairNonce(id) {
   return res.rows;
 }
 
+/**
+ * get trade by gameHash / gameId with fairness
+ *
+ * @param gameHash {String}
+ * @param gameId {String} - gameTypeId
+ */
+async function getTradeWithFairness(gameHash, gameId) {
+  console.log({gameHash, gameId});
+  const res = await (await client).query(GET_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
+  return res.rows;
+}
+
 module.exports = {
   DIRECTION,
   CASINO_TRADE_STATE,
@@ -1159,5 +1175,6 @@ module.exports = {
   getFairRecord,
   createFairRecord,
   updateFairRecord,
-  incrementFairNonce
+  incrementFairNonce,
+  getTradeWithFairness
 };
