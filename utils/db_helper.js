@@ -75,8 +75,11 @@ const GET_REPORT = 'SELECT * FROM bet_reports WHERE bet_id = $1;';
 
 const INSERT_CASINO_MATCH =
   'INSERT INTO casino_matches (gameId, gameHash, crashfactor, gamelengthinseconds, currentHashLine) VALUES ($1, $2, $3, $4, $5) RETURNING id;';
+
 const INSERT_CASINO_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId) VALUES ($1, $2, $3, $4, $5);';
+const INSERT_CASINO_TRADE_HASH =
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash) VALUES ($1, $2, $3, $4, $5, $6);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor) VALUES ($1, $2, $3, $4, $5, $6, $7);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
@@ -86,6 +89,10 @@ const GET_CASINO_TRADES =
   'SELECT userId, crashFactor, stakedAmount FROM casino_trades WHERE gameHash = $1 AND state = $2;';
 const SET_CASINO_TRADE_STATE =
   'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND state = $4 AND userId = $5 RETURNING *;';
+const SET_CASINO_TRADE_NOSTATE =
+  'UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND userId = $4 RETURNING *;';
+const CANCEL_CASINO_TRADE_NOSTATE =
+  `UPDATE casino_trades SET state = $1, crashfactor = $2 WHERE gameHash = $3 AND state = ${CASINO_TRADE_STATE.OPEN} AND userId = $4 RETURNING *;`;
 const CANCEL_CASINO_TRADE =
   `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.CANCELED} WHERE id = $1 AND state = ${CASINO_TRADE_STATE.OPEN} AND gameHash IS NULL RETURNING *;`;
 const GET_CASINO_TRADES_BY_USER_AND_STATES =
@@ -148,6 +155,9 @@ const GET_ALL_TRADES_BY_GAME_HASH =
 
 const SET_CASINO_LOST_TRADES_STATE =
   `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} RETURNING *;`;
+
+const SET_CASINO_LOST_TRADES_NOSTATE =
+  `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = $2 WHERE gamehash = $1 AND state = ${CASINO_TRADE_STATE.OPEN} RETURNING *;`;
 
 const COUNT_CASINO_TRADES_BY_LAST_X_HOURS =
   `SELECT count(id) as totalTrades, COALESCE(SUM(stakedamount),0) as totalVolume FROM casino_trades WHERE state = ANY('{${CASINO_TRADE_STATE.LOCKED},${CASINO_TRADE_STATE.WIN},${CASINO_TRADE_STATE.LOSS}}'::smallint[]) AND created_at >= CURRENT_TIMESTAMP - $1 * INTERVAL '1 hour';`
@@ -365,6 +375,28 @@ async function insertCasinoTrade(client, userWalletAddr, crashFactor, stakedAmou
 }
 
 /**
+ * Saves a new Casino Trade
+ * Meant to be used inside a transaction together with a balance and gamehash
+ *
+ * @param client {Client}
+ * @param userWalletAddr  {String}
+ * @param crashFactor {Number}
+ * @param stakedAmount {Number}
+ * @param gameId {String}
+ * @param gamehash {String}
+ */
+async function insertCasinoTradeHash(client, userWalletAddr, crashFactor, stakedAmount, gameId, gameHash) {
+  await (await client).query(INSERT_CASINO_TRADE_HASH, [
+    userWalletAddr,
+    crashFactor,
+    stakedAmount,
+    CASINO_TRADE_STATE.OPEN,
+    gameId,
+    gameHash
+  ]);
+}
+
+/**
  * Saves a new Casino Trade at once for simple games
  * Meant to be used inside a transaction together with a balance
  *
@@ -416,6 +448,41 @@ async function attemptCashout(client, userwalletAddr, crashFactor, gameHash) {
     userwalletAddr,
   ]);
 }
+
+/**
+ * Attempts to cashout user from a casino trade
+ *
+ * @param {Client} client
+ * @param {String} userwalletAddr
+ * @param {String} gameHash
+ * @returns
+ */
+async function attemptCashoutExternal(client, userwalletAddr, crashFactor, gameHash) {
+  return await (await client).query(SET_CASINO_TRADE_NOSTATE, [
+    CASINO_TRADE_STATE.WIN,
+    crashFactor,
+    gameHash,
+    userwalletAddr,
+  ]);
+}
+
+/**
+ * Attempts to cashout user from a casino trade
+ *
+ * @param {Client} client
+ * @param {String} userwalletAddr
+ * @param {String} gameHash
+ * @returns
+ */
+async function cancelExternal(client, userwalletAddr, crashFactor, gameHash) {
+  return await (await client).query(CANCEL_CASINO_TRADE_NOSTATE, [
+    CASINO_TRADE_STATE.CANCEL,
+    crashFactor,
+    gameHash,
+    userwalletAddr,
+  ]);
+}
+
 
 /**
  * Locks all open trades into specific gameHash
@@ -771,6 +838,18 @@ async function setLostTrades(gameHash, crashFactor) {
 }
 
 /**
+ * Set lost trades and crash factor by gameHash
+ *
+ * @param gameHash {String}
+ * @param crashFactor {String}
+ *
+ */
+async function setLostTradesExternal(gameHash, crashFactor) {
+  const res = await (await client).query(SET_CASINO_LOST_TRADES_NOSTATE, [gameHash, crashFactor])
+  return res.rows;
+}
+
+/**
  * Get high bets (highest amount won)
  * PostgreSQL interval https://www.postgresql.org/docs/8.3/functions-datetime.html
  * @param interval {String}
@@ -1063,11 +1142,14 @@ module.exports = {
   getBetInteractions,
   getBetInteractionsSummary,
   insertCasinoTrade,
+  insertCasinoTradeHash,
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
   getCasinoTrades,
   getCasinoTradesByUserAndStates,
   attemptCashout,
+  cancelExternal,
+  attemptCashoutExternal,
   getAmmPriceActions,
   getLatestPriceActions,
   cancelCasinoTrade,
@@ -1086,6 +1168,7 @@ module.exports = {
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
   setLostTrades,
+  setLostTradesExternal,
   getOpenTrade,
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,

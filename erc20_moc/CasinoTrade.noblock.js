@@ -8,15 +8,18 @@ const {
 const {
   CASINO_TRADE_STATE,
   insertCasinoTrade,
+  insertCasinoTradeHash,
   lockOpenCasinoTrades,
   setCasinoTradeOutcomes,
   // getCasinoTrades,
   attemptCashout,
+  attemptCashoutExternal,
   getCasinoTradesByUserAndStates,
   cancelCasinoTrade,
   getCashedOutBets,
   getUpcomingBets,
   getCurrentBets,
+  cancelExternal,
   getLuckyBetsInInterval,
   getHighBetsInInterval,
   getMatches,
@@ -29,6 +32,7 @@ const {
   getNextMatchByGameHash,
   getPrevMatchByGameHash,
   setLostTrades,
+  setLostTradesExternal,
   getOpenTrade,
   countTradesByLastXHours,
   insertCasinoSingleGameTrade,
@@ -61,6 +65,32 @@ class CasinoTrade {
         stakedAmount
       );
       await insertCasinoTrade(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId);
+
+      await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+  /**
+   * For simple games, so we can insert all at once to casino_trades.
+   * Handle won / lost for single trades
+   */
+
+  placeTradeHash = async (userWalletAddr, stakedAmount, gameHash, crashFactor, gameId) => {
+    if(!gameId) throw new Error('Game id is required to place a trade');
+    const dbClient = await createDBTransaction();
+
+    try {
+      // in the same transaction, transfer the funds, and create the casino trade
+      await this.WFAIRToken.transferChain(
+        dbClient,
+        userWalletAddr,
+        this.casinoWalletAddr,
+        stakedAmount
+      );
+      await insertCasinoTradeHash(dbClient, userWalletAddr, crashFactor, stakedAmount, gameId, gameHash);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -138,6 +168,59 @@ class CasinoTrade {
       await lockOpenCasinoTrades(dbClient, gameId, gameHash, crashFactor, gameLengthMS, currentHashLine);
 
       await commitDBTransaction(dbClient);
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+  cancelTradeExternal = async (userWalletAddr, crashFactor, gameHash, amount) => {
+    const dbClient = await createDBTransaction();
+    try {
+      let res = await cancelExternal(dbClient, userWalletAddr, crashFactor, gameHash);
+
+      if (res.rows.length == 0) {
+        throw 'Transaction did not succeed: Bet was not found';
+      }
+
+      if (amount > 0n) {
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          this.casinoWalletAddr,
+          userWalletAddr,
+          amount
+        );
+        await commitDBTransaction(dbClient);
+        return { amount };
+      } else {
+        throw `Total reward lower than 1: ${amount}`;
+      }
+    } catch (e) {
+      await rollbackDBTransaction(dbClient);
+      throw e;
+    }
+  };
+
+  cashoutExternal = async (userWalletAddr, crashFactor, gameHash, amount) => {
+    const dbClient = await createDBTransaction();
+    try {
+      let res = await attemptCashoutExternal(dbClient, userWalletAddr, crashFactor, gameHash);
+
+      if (res.rows.length == 0) {
+        throw 'Transaction did not succeed: Bet was not found';
+      }
+
+      if (amount > 0n) {
+        await this.WFAIRToken.transferChain(
+          dbClient,
+          this.casinoWalletAddr,
+          userWalletAddr,
+          amount
+        );
+        await commitDBTransaction(dbClient);
+        return { amount };
+      } else {
+        throw `Total reward lower than 1: ${amount}`;
+      }
     } catch (e) {
       await rollbackDBTransaction(dbClient);
       throw e;
@@ -253,6 +336,8 @@ class CasinoTrade {
   getPrevMatchByGameHash = async (gameHash, gameId) => getPrevMatchByGameHash(gameHash, gameId)
 
   setLostTrades = async (gameHash, crashFactor) => setLostTrades(gameHash, crashFactor)
+
+  setLostTradesExternal = async (gameHash, crashFactor) => setLostTradesExternal(gameHash, crashFactor)
 
   getOpenTrade = async (userId, gameId) => getOpenTrade(userId, gameId)
 
