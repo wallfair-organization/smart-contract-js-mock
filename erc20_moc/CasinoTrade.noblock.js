@@ -208,7 +208,6 @@ class CasinoTrade {
       if (res.rows.length == 0) {
         throw 'Transaction did not succeed: Bet was not found';
       }
-
       if (amount > 0n) {
         await this.WFAIRToken.transferChain(
           dbClient,
