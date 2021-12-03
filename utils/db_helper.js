@@ -1196,7 +1196,6 @@ async function incrementFairNonce(id) {
  * @param gameId {String} - gameTypeId
  */
 async function getTradeWithFairness(gameHash, gameId) {
-  console.log({gameHash, gameId});
   const res = await (await client).query(GET_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
   return res.rows;
 }
