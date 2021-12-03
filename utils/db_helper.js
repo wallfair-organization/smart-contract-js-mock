@@ -171,7 +171,7 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
 
 const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1) RETURNING *;'
 const INSERT_MINES_TRADE =
-  `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor, gameHash) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1, $5);`;
+  `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor, gameHash, fairnessId, fairnessNonce) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1, $5, $6, $7);`;
   const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE cast(game_payload ->> 'userId' as varchar) = $1 AND cast(game_payload ->> 'gameState' as int) in (${MINES_GAME_STATE.STARTED}) ORDER BY created_at DESC;`
 const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = 0 WHERE game_match = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $2 RETURNING *;`
 const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
@@ -997,14 +997,17 @@ async function getLastMatchByGameType(gameId) {
 async function createMinesMatch(
   dbClient,
   userId,
-                                stakedAmount,
-                                gameId,
-                                gameHash,
-                                gamePayload){
+  stakedAmount,
+  gameId,
+  gameHash,
+  gamePayload,
+  fairnessId = null,
+  fairnessNonce = null
+){
   try {
     const match = await (await dbClient).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
 
-    const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id, gameHash])
+    const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id, gameHash, fairnessId, fairnessNonce])
 
     return {match, trade}
   } catch (e) {
