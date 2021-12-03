@@ -81,7 +81,7 @@ const INSERT_CASINO_TRADE =
 const INSERT_CASINO_TRADE_HASH =
   'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash) VALUES ($1, $2, $3, $4, $5, $6);';
 const INSERT_CASINO_SINGLE_GAME_TRADE =
-  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor) VALUES ($1, $2, $3, $4, $5, $6, $7);';
+  'INSERT INTO casino_trades (userId, crashFactor, stakedAmount, state, gameId, gameHash, riskFactor, fairnessId, fairnessNonce) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);';
 const LOCK_OPEN_CASINO_TRADES = `UPDATE casino_trades SET state = $1, gameHash = $2, game_match = $3 WHERE state = ${CASINO_TRADE_STATE.OPEN} AND gameId = $4;`;
 const SET_CASINO_TRADE_OUTCOMES =
   'UPDATE casino_trades SET state = CASE WHEN crashFactor <= $2::decimal THEN 2 ELSE 3 end WHERE gameHash = $1 AND state = 1 RETURNING userId, crashFactor, stakedAmount, state;';
@@ -181,11 +181,27 @@ const GET_LATEST_PRICE_ACTIONS = `select * from amm_price_action
 
 const CREATE_MINES_MATCH = 'INSERT INTO casino_matches (game_payload, gameid, gamehash, crashfactor) VALUES($1, $2, $3, 1) RETURNING *;'
 const INSERT_MINES_TRADE =
-  `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor, gameHash) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1, $5);`;
+  `INSERT INTO casino_trades (userId, stakedAmount, state, gameId, game_match, crashfactor, gameHash, fairnessId, fairnessNonce) VALUES ($1, $2, ${CASINO_TRADE_STATE.LOCKED}, $3, $4, 1, $5, $6, $7);`;
   const SELECT_MINES_MATCH_BY_USER_ID = `SELECT * FROM casino_matches WHERE cast(game_payload ->> 'userId' as varchar) = $1 AND cast(game_payload ->> 'gameState' as int) in (${MINES_GAME_STATE.STARTED}) ORDER BY created_at DESC;`
 const SET_MINES_TRADE_LOST = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.LOSS}, crashfactor = 0 WHERE game_match = $1 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $2 RETURNING *;`
 const SET_MINES_TRADE_WON = `UPDATE casino_trades SET state = ${CASINO_TRADE_STATE.WIN}, crashfactor = $1 WHERE game_match = $2 AND state = ${CASINO_TRADE_STATE.LOCKED} AND userId = $3 RETURNING *;`
 const UPDATE_MINES_MATCH = `UPDATE casino_matches SET game_payload = $1 WHERE id = $2 AND cast(game_payload ->> 'userId' as varchar) = $3 returning *`;
+
+//casino_fairness table
+const GET_CASINO_FAIR_RECORD =
+  'SELECT * FROM casino_fairness WHERE userId = $1 AND gameid = $2 ORDER BY created_at DESC LIMIT 1;'
+const INSERT_CASINO_FAIR_RECORD =
+  'INSERT INTO casino_fairness (userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) VALUES ($1, $2, $3, $4, $5, $6, $7);'
+const UPDATE_CASINO_FAIR_RECORD =
+  'UPDATE casino_fairness SET serverSeed = $2, nextServerSeed = $3, clientSeed = $4, nonce = $5, currentHashLine = $6, updated_at = now() WHERE id = $1'
+const UPDATE_CASINO_FAIR_NONCE =
+  'UPDATE casino_fairness SET nonce = nonce + 1, updated_at = now() WHERE id = $1'
+const GET_CASINO_TRADE_WITH_FAIRNESS =
+    'SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE ct.gamehash = $1 AND ct.gameid = $2;'
+const GET_NEXT_CASINO_TRADE_WITH_FAIRNESS =
+    `SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE (SELECT id FROM casino_trades WHERE gamehash = $1 AND gameId = $2) < ct.id AND ct.gameId = $2 ORDER BY ct.ID ASC limit 1;`
+const GET_PREV_CASINO_TRADE_WITH_FAIRNESS =
+    `SELECT * FROM casino_trades ct JOIN casino_fairness cf ON ct.fairnessid = cf.id WHERE (SELECT id FROM casino_trades WHERE gamehash = $1 AND gameId = $2) > ct.id AND ct.gameId = $2 ORDER BY ct.ID DESC limit 1;`
 
 /**
  * @returns {Promise<void>}
@@ -406,7 +422,7 @@ async function insertCasinoTradeHash(client, userWalletAddr, crashFactor, staked
  * @param stakedAmount {Number}
  * @param gameId {String}
  */
-async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor) {
+async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, stakedAmount, gameId, state, gameHash, riskFactor, fairnessId = null, fairnessNonce = null) {
   await (await client).query(INSERT_CASINO_SINGLE_GAME_TRADE, [
     userWalletAddr,
     crashFactor,
@@ -414,7 +430,9 @@ async function insertCasinoSingleGameTrade(client, userWalletAddr, crashFactor, 
     state,
     gameId,
     gameHash,
-    riskFactor
+    riskFactor,
+    fairnessId,
+    fairnessNonce
   ]);
 }
 
@@ -1058,14 +1076,17 @@ async function getLastMatchByGameType(gameId) {
 async function createMinesMatch(
   dbClient,
   userId,
-                                stakedAmount,
-                                gameId,
-                                gameHash,
-                                gamePayload){
+  stakedAmount,
+  gameId,
+  gameHash,
+  gamePayload,
+  fairnessId = null,
+  fairnessNonce = null
+){
   try {
     const match = await (await dbClient).query(CREATE_MINES_MATCH, [gamePayload, gameId, gameHash])
 
-    const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id, gameHash])
+    const trade = await (await dbClient).query(INSERT_MINES_TRADE, [userId, stakedAmount, gameId, match.rows[0].id, gameHash, fairnessId, fairnessNonce])
 
     return {match, trade}
   } catch (e) {
@@ -1110,6 +1131,93 @@ async function updateUsersMinesMatch(matchId, gamePayload, isLost = false){
     const res = await (await client).query(SET_MINES_TRADE_LOST, [matchId, gamePayload.userId])
     return res.rows;
   }
+}
+
+/**
+ * get record from casino_fairness
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ */
+async function getFairRecord(userId, gameId) {
+  const res = await (await client).query(GET_CASINO_FAIR_RECORD, [userId, gameId])
+  return res.rows;
+}
+
+/**
+ * create fair record
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ * @param serverSeed {String}
+ * @param clientSeed {String}
+ * @param nonce {Number}
+ * @param currentHashLine {Number}
+ */
+async function createFairRecord(userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) {
+  const res = await (await client).query(INSERT_CASINO_FAIR_RECORD, [userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine])
+  return res.rows;
+}
+
+/**
+ * update fair record
+ *
+ * @param id {String}
+ * @param serverSeed {String}
+ * @param clientSeed {String}
+ * @param nonce {Number}
+ * @param currentHashLine {Number}
+ */
+async function updateFairRecord(id, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_RECORD, [id, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine])
+  return res.rows;
+}
+
+/**
+ * increment bet number = nonce (zero based) starting from 0
+ *
+ * @param userId {String}
+ * @param gameId {String}
+ */
+async function incrementFairNonce(id) {
+  const res = await (await client).query(UPDATE_CASINO_FAIR_NONCE, [id])
+  return res.rows;
+}
+
+/**
+ * get trade by gameHash / gameId with fairness
+ *
+ * @param gameHash {String}
+ * @param gameId {String} - gameTypeId
+ */
+async function getTradeWithFairness(gameHash, gameId) {
+  console.log({gameHash, gameId});
+  const res = await (await client).query(GET_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
+  return res.rows;
+}
+
+/**
+ * get next match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ * @param gameId {String}
+ */
+async function getNextTradeWithFairness(gameHash, gameId) {
+  const res = await (await client).query(GET_NEXT_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
+  return res.rows;
+}
+
+/**
+ * get prev match based on gameHash
+ * PostgreSQL
+ *
+ * @param gameHash {String}
+ * @param gameId {String}
+ */
+async function getPrevTradeWithFairness(gameHash, gameId) {
+  const res = await (await client).query(GET_PREV_CASINO_TRADE_WITH_FAIRNESS, [gameHash, gameId])
+  return res.rows;
 }
 
 module.exports = {
@@ -1176,5 +1284,12 @@ module.exports = {
   getLastMatchByGameType,
   createMinesMatch,
   getUsersMinesMatch,
-  updateUsersMinesMatch
+  updateUsersMinesMatch,
+  getFairRecord,
+  createFairRecord,
+  updateFairRecord,
+  incrementFairNonce,
+  getTradeWithFairness,
+  getNextTradeWithFairness,
+  getPrevTradeWithFairness
 };

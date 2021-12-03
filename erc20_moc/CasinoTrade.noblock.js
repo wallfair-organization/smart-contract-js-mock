@@ -40,7 +40,14 @@ const {
   getLastMatchByGameType,
   createMinesMatch,
   getUsersMinesMatch,
-  updateUsersMinesMatch
+  updateUsersMinesMatch,
+  getFairRecord,
+  createFairRecord,
+  updateFairRecord,
+  incrementFairNonce,
+  getTradeWithFairness,
+  getNextTradeWithFairness,
+  getPrevTradeWithFairness
 } = require('../utils/db_helper');
 
 const WFAIR_TOKEN = 'WFAIR';
@@ -104,7 +111,7 @@ class CasinoTrade {
    * For simple games, so we can insert all at once to casino_trades.
    * Handle won / lost for single trades
    */
-  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash, riskFactor) => {
+  placeSingleGameTrade = async (userWalletAddr, stakedAmount, multiplier, gameId, state, gameHash, riskFactor, fairnessId, fairnessNonce) => {
     const dbClient = await createDBTransaction();
 
     try {
@@ -133,7 +140,7 @@ class CasinoTrade {
         );
       }
 
-      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash, riskFactor);
+      await insertCasinoSingleGameTrade(dbClient, userWalletAddr, multiplier, stakedAmount, gameId, state, gameHash, riskFactor, fairnessId, fairnessNonce);
 
       await commitDBTransaction(dbClient);
     } catch (e) {
@@ -345,7 +352,7 @@ class CasinoTrade {
   getLastCasinoTradesByGameType = async (gameId, userId, limit) => getLastCasinoTradesByGameType(gameId, userId, limit)
   getLastMatchByGameType = async (gameId) => getLastMatchByGameType(gameId)
 
-  createMinesMatch = async (gameId, userId, stakedAmount, gameHash, gamePayload) => {
+  createMinesMatch = async (gameId, userId, stakedAmount, gameHash, gamePayload, fairnessId, fairnessNonce) => {
     const dbClient = await createDBTransaction();
     try{
       await this.WFAIRToken.transferChain(
@@ -354,7 +361,7 @@ class CasinoTrade {
         this.casinoWalletAddr,
         stakedAmount
       );
-      await createMinesMatch(dbClient, userId, stakedAmount, gameId, gameHash, JSON.stringify(gamePayload));
+      await createMinesMatch(dbClient, userId, stakedAmount, gameId, gameHash, JSON.stringify(gamePayload), fairnessId, fairnessNonce);
       await commitDBTransaction(dbClient);
     } catch (e) {
       await rollbackDBTransaction(dbClient);
@@ -376,8 +383,13 @@ class CasinoTrade {
     return await updateUsersMinesMatch(res.id, gamePayload, isLost)
   }
 
-
-
+  getFairRecord = async (userId, gameId) => getFairRecord(userId, gameId)
+  createFairRecord = async (userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine) => createFairRecord(userId, gameId, serverSeed, nextServerSeed, clientSeed, nonce, currentHashLine)
+  updateFairRecord = async (userId, gameId, serverSeed, clientSeed, nonce, currentHashLine) => updateFairRecord(userId, gameId, serverSeed, clientSeed, nonce, currentHashLine)
+  incrementFairNonce = async (userId, gameId) => incrementFairNonce(userId, gameId)
+  getTradeWithFairness = async (gameHash, gameId) => getTradeWithFairness(gameHash, gameId)
+  getNextTradeWithFairness = async (gameHash, gameId) => getNextTradeWithFairness(gameHash, gameId)
+  getPrevTradeWithFairness = async (gameHash, gameId) => getPrevTradeWithFairness(gameHash, gameId)
 }
 
 module.exports = CasinoTrade;
